@@ -65,12 +65,13 @@ pub struct Equalizer {
     preamp: f32,
     /// vocal reducer: low-pass memory for the centre (mid) signal, so bass and kick stay
     lp: f32,
+    lp2: f32,
     lp_alpha: f32,
 }
 
 impl Equalizer {
     pub fn new(sample_rate: u32, channels: usize, settings: EqSettings) -> Self {
-        let mut e = Equalizer { sample_rate: sample_rate as f32, channels, settings: EqSettings::default(), filters: vec![], preamp: 1.0, lp: 0.0, lp_alpha: 1.0 - (-2.0 * PI * 150.0 / (sample_rate as f32)).exp() };
+        let mut e = Equalizer { sample_rate: sample_rate as f32, channels, settings: EqSettings::default(), filters: vec![], preamp: 1.0, lp: 0.0, lp2: 0.0, lp_alpha: 1.0 - (-2.0 * PI * 150.0 / (sample_rate as f32)).exp() };
         e.set(settings);
         e
     }
@@ -98,8 +99,10 @@ impl Equalizer {
         if self.channels == 2 && amount > 0.0 {
             for f in buf.chunks_exact_mut(2) {
                 let mid = (f[0] + f[1]) * 0.5;
+                // two cascaded one-pole low-passes (12 dB/octave) isolate the bass cleanly
                 self.lp += self.lp_alpha * (mid - self.lp);
-                let hp = mid - self.lp;
+                self.lp2 += self.lp_alpha * (self.lp - self.lp2);
+                let hp = mid - self.lp2;
                 f[0] -= amount * hp;
                 f[1] -= amount * hp;
             }
