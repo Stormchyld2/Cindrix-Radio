@@ -6,7 +6,9 @@ mod meta;
 mod paths;
 mod podcasts;
 mod player;
+mod radio;
 mod settings;
+mod stream;
 
 use player::{Player, PlayerState, Track};
 use std::sync::Mutex;
@@ -14,6 +16,7 @@ use engine::Engine;
 use history::HistoryStore;
 use library::{Counts, LibraryStore, Page, ScanSummary, SourceStatus};
 use player::Kind;
+use radio::{Station, StationStore};
 use podcasts::{Feed, PodStore};
 use serde::Serialize;
 use tauri::State;
@@ -55,9 +58,11 @@ fn save_outgoing(h: &HistoryStore, lib: &LibraryStore, s: &PlayerState) {
 /// Start whatever the player state says is current, resuming a saved position if there is one.
 /// Streams arrive with Radio.
 fn begin(engine: &Engine, h: &HistoryStore, lib: &LibraryStore, s: &mut PlayerState) {
-    match s.current.as_ref().and_then(|t| t.path.as_deref()) {
-        Some(path) => engine.play_file(path),
-        None => { engine.stop(); return; }
+    let (path, url) = match s.current.as_ref() { Some(t) => (t.path.clone(), t.url.clone()), None => (None, None) };
+    match (path, url) {
+        (Some(path), _) => engine.play_file(&path),
+        (None, Some(url)) => { engine.play_stream(&url); return; }
+        _ => { engine.stop(); return; }
     }
     if let Some(t) = s.current.as_ref().filter(|t| resumable(t)) {
         if let Some(k) = key_of(lib, t) {
@@ -79,6 +84,9 @@ fn player_state(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib:
     let st = e.status();
     if s.playing && s.current.is_some() { s.position_secs = st.position_secs; }
     s.error = st.error;
+    s.now_playing = st.now_playing;
+    s.recording = st.recording;
+    s.connecting = st.connecting;
     if s.playing {
         if let Some(t) = s.current.as_ref().filter(|t| resumable(t)) {
             if let Some(k) = key_of(&lib, t) { h.record_periodic(&k, s.position_secs, 15); }
@@ -96,8 +104,12 @@ fn player_state(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib:
 }
 
 #[tauri::command]
-fn player_play(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>, track: Track) -> PlayerState {
+fn player_play(settings: State<AppSettings>, p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>, track: Track) -> PlayerState {
     let mut s = p.0.lock().unwrap();
+    if track.url.is_some() && online_or_err(&settings).is_err() {
+        e.set_error("Grid-Down mode is on, so live streams are off. Switch to Online mode to listen.");
+        return s.clone();
+    }
     save_outgoing(&h, &lib, &s);
     s.play(track);
     begin(&e, &h, &lib, &mut s);
@@ -287,6 +299,69 @@ fn library_genres(lib: State<LibraryStore>, kind: Option<Kind>) -> Vec<(String, 
 #[tauri::command]
 fn library_counts(lib: State<LibraryStore>) -> Counts { lib.counts() }
 
+#[derive(Serialize)]
+struct ImportStations { stations: Vec<Station>, added: usize }
+
+#[tauri::command]
+fn radio_stations(st: State<StationStore>) -> Vec<Station> { st.list() }
+
+#[tauri::command]
+fn radio_add(st: State<StationStore>, station: Station) -> Result<Vec<Station>, String> { st.add(station) }
+
+#[tauri::command]
+fn radio_remove(st: State<StationStore>, id: String) -> Vec<Station> { st.remove(&id) }
+
+#[tauri::command]
+fn radio_import(st: State<StationStore>, text: String) -> Result<ImportStations, String> {
+    let (stations, added) = st.import(&text);
+    if added == 0 && stations.is_empty() { return Err("No stream addresses found in that file".into()); }
+    Ok(ImportStations { stations, added })
+}
+
+#[tauri::command]
+async fn radio_probe(settings: State<'_, AppSettings>, url: String) -> Result<stream::StreamInfo, String> {
+    online_or_err(&settings)?;
+    blocking(move || stream::probe(&url)).await
+}
+
+#[tauri::command]
+async fn radio_search(settings: State<'_, AppSettings>, query: String, tag: Option<String>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
+    online_or_err(&settings)?;
+    blocking(move || radio::search(&query, tag.as_deref(), limit.min(100), offset)).await
+}
+
+#[tauri::command]
+fn radio_play(settings: State<AppSettings>, p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>, station: Station) -> Result<PlayerState, String> {
+    online_or_err(&settings)?;
+    if let Some(u) = station.rb_uuid.as_deref() { radio::count_click(u); }
+    let track = Track {
+        id: station.id.clone(),
+        title: station.name.clone(),
+        subtitle: station.tags.clone().unwrap_or_else(|| "Live radio".into()),
+        kind: Kind::Radio,
+        duration_secs: None,
+        path: None,
+        url: Some(station.url.clone()),
+    };
+    let mut s = p.0.lock().unwrap();
+    save_outgoing(&h, &lib, &s);
+    s.play(track);
+    begin(&e, &h, &lib, &mut s);
+    Ok(s.clone())
+}
+
+/// Start or stop saving the live stream. Recordings go to the Radio folder by default.
+#[tauri::command]
+fn radio_record(e: State<Engine>, start: bool, name: String) -> Result<Option<String>, String> {
+    if start {
+        let dir = std::path::PathBuf::from(paths::default_folders().radio);
+        e.start_recording(&dir, &name).map(|p| Some(p.to_string_lossy().into_owned()))
+    } else {
+        e.stop_recording();
+        Ok(None)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -298,6 +373,7 @@ pub fn run() {
             let path = dir.join("settings.json");
             let loaded = settings::Settings::load(&path);
             app.manage(Engine::start(loaded.eq.clone(), 0.8));
+            app.manage(StationStore::load(std::path::PathBuf::from(paths::default_folders().radio).join("radio_stations.json")));
             app.manage(HistoryStore::load(dir.join("playback_history.json")));
             app.manage(LibraryStore::load(dir.join("library.json")));
             app.manage(PodStore::load(dir.join("podcasts.json")));
@@ -311,7 +387,8 @@ pub fn run() {
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
-            library_scan, library_search, library_genres, library_counts
+            library_scan, library_search, library_genres, library_counts,
+            radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");

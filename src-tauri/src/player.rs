@@ -17,6 +17,9 @@ pub struct Track {
     /// Local file to play. None for streams (added with Radio).
     #[serde(default)]
     pub path: Option<String>,
+    /// Live stream address (radio).
+    #[serde(default)]
+    pub url: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -27,6 +30,10 @@ pub struct PlayerState {
     pub position_secs: u32,
     pub volume: f32,
     pub error: Option<String>,
+    /// Current song title from the stream, when the station sends one.
+    pub now_playing: Option<String>,
+    pub recording: bool,
+    pub connecting: bool,
 }
 
 pub struct Player(pub Mutex<PlayerState>);
@@ -59,7 +66,7 @@ impl PlayerState {
 mod tests {
     use super::*;
     fn t(id: &str) -> Track {
-        Track { id: id.into(), title: id.into(), subtitle: String::new(), kind: Kind::Music, duration_secs: None, path: None }
+        Track { id: id.into(), title: id.into(), subtitle: String::new(), kind: Kind::Music, duration_secs: None, path: None, url: None }
     }
     #[test]
     fn next_advances_queue() {

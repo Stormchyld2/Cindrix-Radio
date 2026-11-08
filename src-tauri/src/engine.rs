@@ -5,7 +5,9 @@ use crate::dsp::{EqSettings, Equalizer};
 use rodio::{Decoder, OutputStream, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::stream::{self, CurrentInfo, NowPlaying, Recorder, StreamInfo, StreamSource};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -83,19 +85,45 @@ impl<S: Source<Item = f32>> Source for EqSource<S> {
     fn total_duration(&self) -> Option<Duration> { self.inner.total_duration() }
 }
 
-enum Cmd { Play(String), Pause, Resume, Stop, Volume(f32), Seek(u32) }
+enum Cmd { Play(String), Ready(u64, StreamSource, StreamInfo), Pause, Resume, Stop, Volume(f32), Seek(u32) }
 
 #[derive(Clone, Default)]
 pub struct Status {
     pub position_secs: u32,
     pub ended: bool,
     pub error: Option<String>,
+    pub now_playing: Option<String>,
+    pub recording: bool,
+    pub connecting: bool,
+}
+
+/// "YYYY-MM-DD_HHMMSS" in UTC, for recording file names.
+pub fn utc_stamp(epoch_secs: u64) -> String {
+    let days = (epoch_secs / 86400) as i64;
+    let rem = epoch_secs % 86400;
+    // civil-from-days (Howard Hinnant)
+    let z = days + 719468;
+    let era = z.div_euclid(146097);
+    let doe = z.rem_euclid(146097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}_{:02}{:02}{:02}", rem / 3600, (rem % 3600) / 60, rem % 60)
 }
 
 pub struct Engine {
     tx: Mutex<Sender<Cmd>>,
     status: Arc<Mutex<Status>>,
     ended: Arc<AtomicBool>,
+    gen: Arc<AtomicU64>,
+    connecting: Arc<AtomicBool>,
+    now: NowPlaying,
+    rec: Recorder,
+    info: CurrentInfo,
     pub eq: SharedEq,
 }
 
@@ -106,6 +134,10 @@ impl Engine {
         let ended = Arc::new(AtomicBool::new(false));
         let shared = SharedEq::new(eq);
         let (st, en, sh) = (status.clone(), ended.clone(), shared.clone());
+        let gen = Arc::new(AtomicU64::new(0));
+        let connecting = Arc::new(AtomicBool::new(false));
+        let info: CurrentInfo = Arc::new(Mutex::new(None));
+        let (gen_t, conn_t, info_t) = (gen.clone(), connecting.clone(), info.clone());
 
         std::thread::spawn(move || {
             let device = OutputStream::try_default();
@@ -122,6 +154,7 @@ impl Engine {
             };
             sink.set_volume(volume);
             let mut playing = false;
+            let mut is_stream = false;
             loop {
                 match rx.recv_timeout(Duration::from_millis(250)) {
                     Ok(Cmd::Play(path)) => {
@@ -133,10 +166,24 @@ impl Engine {
                                 sink.append(EqSource::new(dec.convert_samples::<f32>(), sh.clone()));
                                 sink.play();
                                 playing = true;
+                                is_stream = false;
                                 en.store(false, Ordering::SeqCst);
                                 st.lock().unwrap().error = None;
                             }
                             Err(e) => { playing = false; st.lock().unwrap().error = Some(format!("Cannot play {path}: {e}")); }
+                        }
+                    }
+                    Ok(Cmd::Ready(g, src, i)) => {
+                        if g == gen_t.load(Ordering::SeqCst) {
+                            sink.stop();
+                            sink.append(EqSource::new(src, sh.clone()));
+                            sink.play();
+                            playing = true;
+                            is_stream = true;
+                            en.store(false, Ordering::SeqCst);
+                            *info_t.lock().unwrap() = Some(i);
+                            conn_t.store(false, Ordering::SeqCst);
+                            st.lock().unwrap().error = None;
                         }
                     }
                     Ok(Cmd::Pause) => sink.pause(),
@@ -149,23 +196,83 @@ impl Engine {
                 }
                 let mut s = st.lock().unwrap();
                 s.position_secs = sink.get_pos().as_secs() as u32;
-                if playing && sink.empty() { playing = false; en.store(true, Ordering::SeqCst); }
+                if playing && sink.empty() {
+                    playing = false;
+                    if is_stream { s.error = Some("The stream stopped. The station may have gone offline.".into()); }
+                    else { en.store(true, Ordering::SeqCst); }
+                }
                 s.ended = en.load(Ordering::SeqCst);
             }
         });
 
-        Engine { tx: Mutex::new(tx), status, ended, eq: shared }
+        Engine { tx: Mutex::new(tx), status, ended, gen, connecting, now: Arc::new(Mutex::new(None)), rec: Arc::new(Mutex::new(None)), info, eq: shared }
     }
 
     fn send(&self, c: Cmd) { let _ = self.tx.lock().unwrap().send(c); }
-    pub fn play_file(&self, path: &str) { self.ended.store(false, Ordering::SeqCst); self.send(Cmd::Play(path.to_string())); }
+    pub fn play_file(&self, path: &str) {
+        self.gen.fetch_add(1, Ordering::SeqCst);
+        self.connecting.store(false, Ordering::SeqCst);
+        self.stop_recording();
+        *self.now.lock().unwrap() = None;
+        self.ended.store(false, Ordering::SeqCst);
+        self.send(Cmd::Play(path.to_string()));
+    }
+
+    /// Connect to a live stream in the background; sound starts when audio arrives.
+    pub fn play_stream(&self, url: &str) {
+        let g = self.gen.fetch_add(1, Ordering::SeqCst) + 1;
+        self.stop_recording();
+        *self.now.lock().unwrap() = None;
+        *self.info.lock().unwrap() = None;
+        self.connecting.store(true, Ordering::SeqCst);
+        self.status.lock().unwrap().error = None;
+        self.send(Cmd::Stop);
+        let (tx, url) = (self.tx.lock().unwrap().clone(), url.to_string());
+        let (now, rec, gen, conn, status) = (self.now.clone(), self.rec.clone(), self.gen.clone(), self.connecting.clone(), self.status.clone());
+        std::thread::spawn(move || match stream::open(&url, now, rec) {
+            Ok(o) => { let _ = tx.send(Cmd::Ready(g, o.source, o.info)); }
+            Err(e) => {
+                if gen.load(Ordering::SeqCst) == g {
+                    conn.store(false, Ordering::SeqCst);
+                    status.lock().unwrap().error = Some(e);
+                }
+            }
+        });
+    }
+
+    /// Start saving the live stream to <dir>/<station> <date>.<ext>. Returns the file path.
+    pub fn start_recording(&self, dir: &Path, station: &str) -> Result<PathBuf, String> {
+        let info = self.info.lock().unwrap().clone().ok_or("Play a station first, then record it")?;
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let name = format!("{} {}.{}", crate::podcasts::sanitize_name(station), utc_stamp(secs), info.extension());
+        let path = dir.join(name);
+        let f = std::fs::File::create(&path).map_err(|e| e.to_string())?;
+        *self.rec.lock().unwrap() = Some(f);
+        Ok(path)
+    }
+
+    pub fn set_error(&self, msg: &str) { self.status.lock().unwrap().error = Some(msg.to_string()); }
+
+    pub fn stop_recording(&self) { *self.rec.lock().unwrap() = None; }
     pub fn pause(&self) { self.send(Cmd::Pause) }
     pub fn resume(&self) { self.send(Cmd::Resume) }
-    pub fn stop(&self) { self.send(Cmd::Stop) }
+    pub fn stop(&self) {
+        self.gen.fetch_add(1, Ordering::SeqCst);
+        self.connecting.store(false, Ordering::SeqCst);
+        self.stop_recording();
+        self.send(Cmd::Stop);
+    }
     pub fn set_volume(&self, v: f32) { self.send(Cmd::Volume(v)) }
     pub fn seek(&self, secs: u32) { self.send(Cmd::Seek(secs)) }
     pub fn set_eq(&self, s: EqSettings) { self.eq.set(s) }
-    pub fn status(&self) -> Status { self.status.lock().unwrap().clone() }
+    pub fn status(&self) -> Status {
+        let mut s = self.status.lock().unwrap().clone();
+        s.now_playing = self.now.lock().unwrap().clone();
+        s.recording = self.rec.lock().unwrap().is_some();
+        s.connecting = self.connecting.load(Ordering::SeqCst);
+        s
+    }
     pub fn take_ended(&self) -> bool { self.ended.swap(false, Ordering::SeqCst) }
 }
 
@@ -191,6 +298,13 @@ mod tests {
         fn sample_rate(&self) -> u32 { 44100 }
         fn total_duration(&self) -> Option<Duration> { None }
         fn try_seek(&mut self, p: Duration) -> Result<(), rodio::source::SeekError> { self.seeks.lock().unwrap().push(p); Ok(()) }
+    }
+
+    #[test]
+    fn recording_stamp_is_a_readable_utc_date() {
+        assert_eq!(utc_stamp(0), "1970-01-01_000000");
+        assert_eq!(utc_stamp(1_762_560_000 + 3661), "2025-11-08_010101");
+        assert_eq!(utc_stamp(951_782_400), "2000-02-29_000000");
     }
 
     #[test]
