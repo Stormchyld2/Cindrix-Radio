@@ -156,3 +156,17 @@ UI testing must include narrow Windows window, desktop wheel and keyboard, Andro
 ## 11. Settings delivery gates (2026-11-07)
 
 Implement the complete Settings specification in [010 — Settings Architecture](010-settings-architecture.md). **Settings remains a single top-level tab with 16 subtabs.** General opens by default; Windows uses secondary Settings navigation and Android uses a compact in-Settings subtab selector entered via the main hamburger drawer. Four category headings organize rather than add hierarchy. Include searchable controls, proper persistence and safe recovery, supported platform-only options, category-specific resets, and backup/restore with no secret export. Validate that no Settings action silently deletes user originals, enables LAN sharing, or creates persistent karaoke stems. Test hidden-but-functional scrolling, dangerous-action confirmations, single playback-coordinator updates, and Windows/Android setting parity. Defaults in 010 that are not marked LOCKED are suggested v1 choices and may be refined during platform testing; conditional or optional features must never be displayed as available before implementation.
+
+
+## 11. Decision log — mockup review (2026-11-08)
+Approved by the product owner during UI mockup review; supersedes earlier wording in 001–007 and 010 where they differ.
+
+- **Scope:** Cindrix Radio is a general media player (music, radio, podcasts, audiobooks, **videos**, karaoke, LAN share). Video is in scope, including locally stored YouTube downloads; first release plays and lists them.
+- **Stack:** Tauri 2 + Svelte/TypeScript + Rust on Windows; Tauri 2 Android for the phone. The Android background/lock-screen playback proof of concept stays a gate; keep the audio core in Rust so a native Media3 host remains possible.
+- **Sources:** up to **5** drives/folders, each tagged for Music, Podcasts, Audiobooks and/or Videos. Settings subtab 06 is named **Library & Sources**.
+- **EQ:** one global EQ control for all audio **except** audio with its own mixer (Karaoke uses its faders). The global EQ is not applied to karaoke mixer output.
+- **Dashboard:** no second Now Playing module (the persistent bottom player is the only one). Stat buttons: Library, Radio, Playlists. Favorites carousel (two rows, 20 slots) sits under Quick Tools. Right-column cards are fixed size and scroll internally with no visible scrollbar. Record icon is red.
+- **Bottom bar:** EQ button, Library button, expand button.
+- **Downloads:** no dashboard card; lives in Settings → Downloads & Storage plus offline badges/filters.
+- **Saves:** default root is `Downloads/Cindrix/<Kind>` (Radio, Music, Podcasts, Videos). Radio favorites and recordings default to `Downloads/Cindrix/Radio`. The root and each kind can be changed.
+- **Radio directory:** Radio Browser plus manual stream URLs and M3U/PLS import. SHOUTcast/iHeart directories are not used. Stream-rights documentation is required before store release.
