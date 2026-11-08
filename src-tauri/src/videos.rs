@@ -28,12 +28,12 @@ pub struct VideoSource { pub id: &'static str, pub label: &'static str, pub can_
 
 pub fn sources() -> Vec<VideoSource> {
     let mut v = Vec::new();
-    #[cfg(feature = "ytdl")]
+    #[cfg(ytdl_on)]
     {
         v.push(VideoSource { id: "youtube", label: "YouTube", can_download: true });
         v.push(VideoSource { id: "web", label: "Any website (paste a link)", can_download: true });
     }
-    #[cfg(not(feature = "ytdl"))]
+    #[cfg(not(ytdl_on))]
     v.push(VideoSource { id: "youtube", label: "YouTube (watch only)", can_download: false });
     v.push(VideoSource { id: "archive", label: "Internet Archive", can_download: true });
     v.push(VideoSource { id: "peertube", label: "PeerTube", can_download: true });
@@ -235,30 +235,30 @@ pub fn download(data_dir: &Path, hit: &VideoHit, videos_root: &Path) -> Result<P
 
 // ---------------------------------------------------------------- YouTube (private build only)
 
-#[cfg(feature = "ytdl")]
+#[cfg(ytdl_on)]
 pub use ytdl::{install as ytdl_install, version as ytdl_version};
 
-#[cfg(not(feature = "ytdl"))]
+#[cfg(not(ytdl_on))]
 pub fn ytdl_install(_: &Path) -> Result<String, String> { Err("The YouTube downloader is not part of this build.".into()) }
-#[cfg(not(feature = "ytdl"))]
+#[cfg(not(ytdl_on))]
 pub fn ytdl_version(_: &Path) -> Option<String> { None }
 
-#[cfg(feature = "ytdl")]
+#[cfg(ytdl_on)]
 fn youtube_search(data_dir: &Path, q: &str, limit: u32, offset: u32) -> Result<Vec<VideoHit>, String> {
     ytdl::search(data_dir, q, limit, offset)
 }
-#[cfg(not(feature = "ytdl"))]
+#[cfg(not(ytdl_on))]
 fn youtube_search(_: &Path, _: &str, _: u32, _: u32) -> Result<Vec<VideoHit>, String> {
     Err("YouTube search is not part of this build.".into())
 }
-#[cfg(feature = "ytdl")]
+#[cfg(ytdl_on)]
 fn youtube_download(data_dir: &Path, hit: &VideoHit, dir: &Path) -> Result<PathBuf, String> { ytdl::download(data_dir, hit, dir) }
-#[cfg(not(feature = "ytdl"))]
+#[cfg(not(ytdl_on))]
 fn youtube_download(_: &Path, _: &VideoHit, _: &Path) -> Result<PathBuf, String> {
     Err("Downloading from YouTube is not part of this build. You can still watch it online.".into())
 }
 
-#[cfg(feature = "ytdl")]
+#[cfg(ytdl_on)]
 pub mod ytdl {
     use super::*;
     use std::process::Command;
@@ -486,13 +486,13 @@ mod tests {
     fn source_list_always_has_the_open_sources() {
         let ids: Vec<_> = sources().iter().map(|s| s.id).collect();
         assert!(ids.contains(&"archive") && ids.contains(&"peertube") && ids.contains(&"youtube"));
-        #[cfg(feature = "ytdl")]
+        #[cfg(ytdl_on)]
         assert!(ids.contains(&"web"));
-        #[cfg(not(feature = "ytdl"))]
+        #[cfg(not(ytdl_on))]
         assert!(!ids.contains(&"web"));
     }
 
-    #[cfg(feature = "ytdl")]
+    #[cfg(ytdl_on)]
     #[test]
     fn youtube_results_and_single_links_are_read() {
         let list = json!({"entries":[{"id":"dQw4w9WgXcQ","ie_key":"Youtube","title":"T","channel":"C","duration":212.0},{"id":"bad id!","ie_key":"Youtube"}]});
