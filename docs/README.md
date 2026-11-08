@@ -14,6 +14,7 @@ Cindrix Radio is a local-first Windows and Android audio application for podcast
 6. [006 — Karaoke and lyrics](006-karaoke.md)
 7. [007 — Media library, podcasts and radio](007-media-library-and-sources.md)
 8. [008 — Security, reliability, testing and delivery](008-quality-and-delivery.md)
+9. [009 — Implementation contracts, cross-platform parity and release gates](009-implementation-contracts.md)
 
 ## Locked decisions
 
@@ -36,3 +37,12 @@ Documented requirements are approved product scope; library/codec/framework sele
 ## Implementation gate
 
 Do not claim features work until Windows and Android builds have been tested, including a completely isolated hotspot/LAN test and one-device Bluetooth audio routing test.
+
+
+## Brand assets
+
+The approved Cindrix Radio logo belongs at `images/logo.png` at the repository root. A reusable full-resolution source should be retained where possible. The identity is a dark graphite/metallic shield with blue radio-wave accents and an antenna motif; avoid conflating branding with a working app build.
+
+## Requirements-to-tests handoff
+
+Use [009](009-implementation-contracts.md) as the cross-platform test contract when implementing documents 001–008. In particular, verify LAN Only with internet disconnected, music default one-second track gap, Bluetooth disconnect safety, and karaoke on-demand vocal reduction with **no permanent processed audio copies**.
