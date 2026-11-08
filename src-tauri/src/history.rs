@@ -45,6 +45,13 @@ impl HistoryStore {
         if std::fs::write(&tmp, body).is_ok() { let _ = std::fs::rename(tmp, &self.path); }
     }
 
+    /// Forget every saved position and played mark.
+    pub fn clear(&self) {
+        let mut g = self.entries.lock().unwrap();
+        g.clear();
+        self.write(&g);
+    }
+
     /// Save a position now.
     pub fn record(&self, key: &str, secs: u32) {
         let mut g = self.entries.lock().unwrap();

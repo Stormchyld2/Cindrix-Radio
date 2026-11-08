@@ -1,5 +1,6 @@
 #[cfg(target_os = "android")]
 mod android;
+mod admin;
 mod dsp;
 mod engine;
 mod history;
@@ -36,6 +37,8 @@ pub struct AppSettings {
 }
 
 impl AppSettings {
+    pub fn update_pub(&self, f: impl FnOnce(&mut settings::Settings)) -> settings::Settings { self.update(f) }
+
     fn update(&self, f: impl FnOnce(&mut settings::Settings)) -> settings::Settings {
         let mut g = self.inner.lock().unwrap();
         f(&mut g);
@@ -260,6 +263,8 @@ fn lyrics_list(s: State<AppSettings>, l: State<LyricsStore>) -> Vec<LyricsSummar
 struct ImportResult { feeds: Vec<Feed>, failed: Vec<String> }
 
 type Blocking<T> = Result<T, String>;
+
+pub(crate) async fn blocking_pub<T: Send + 'static>(f: impl FnOnce() -> Blocking<T> + Send + 'static) -> Blocking<T> { blocking(f).await }
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Blocking<T> + Send + 'static) -> Blocking<T> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
@@ -534,6 +539,7 @@ pub fn run() {
             let dir = app.path().app_data_dir().expect("app data dir");
             let path = dir.join("settings.json");
             let loaded = settings::Settings::load(&path);
+            paths::set_root_override(loaded.download_root.clone());
             app.manage(Engine::start(loaded.eq.clone(), 0.8));
             app.manage(StationStore::load(std::path::PathBuf::from(paths::default_folders().radio).join("radio_stations.json")));
             app.manage(HistoryStore::load(dir.join("playback_history.json")));
@@ -560,7 +566,9 @@ pub fn run() {
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
             playlists_get, playlist_create, playlist_rename, playlist_delete, playlist_add, playlist_remove, playlist_shift, favorite_toggle,
-            video_sources, video_search, video_download, ytdl_status, ytdl_install, open_bluetooth_settings
+            video_sources, video_search, video_download, ytdl_status, ytdl_install, open_bluetooth_settings,
+            admin::storage_report, admin::set_prefs, admin::set_pause_on_disconnect, admin::set_download_root, admin::privacy_clear,
+            admin::backup_make, admin::backup_list, admin::backup_restore, admin::backup_delete, admin::diagnostics
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");

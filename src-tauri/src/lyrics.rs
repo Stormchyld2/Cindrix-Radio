@@ -51,6 +51,13 @@ impl LyricsStore {
         Ok(())
     }
 
+    /// Remove every lyric the user pasted.
+    pub fn clear(&self) {
+        let mut items = self.items.lock().unwrap();
+        items.clear();
+        self.save(&items);
+    }
+
     pub fn list(&self) -> Vec<Summary> {
         let mut v: Vec<Summary> = self.items.lock().unwrap().iter()
             .map(|e| Summary { path: e.path.clone(), title: e.title.clone(), chars: e.text.chars().count() }).collect();

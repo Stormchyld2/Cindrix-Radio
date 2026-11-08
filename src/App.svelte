@@ -12,11 +12,42 @@
   import Favorites from "./lib/Favorites.svelte";
   import VideoPlayer from "./lib/VideoPlayer.svelte";
   import TermsGate from "./lib/TermsGate.svelte";
+  import NowPlaying from "./lib/NowPlaying.svelte";
+  import { ui } from "./lib/ui.svelte";
+  import { api } from "./lib/api";
   import { store, settingsActions, TERMS_VERSION } from "./lib/settings.svelte";
 
   onMount(async () => {
     await settingsActions.load();
     await actions.init();
+    if (store.s?.prefs.auto_refresh_podcasts && !store.s.grid_down) api.podcastRefresh().catch(() => {});
+  });
+
+  // look and feel from Settings → Appearance
+  $effect(() => {
+    const p = store.s?.prefs;
+    const r = document.documentElement;
+    r.style.setProperty("--scale", String(p?.text_scale ?? 1));
+    r.dataset.accent = p?.accent ?? "blue";
+    if (p?.high_contrast) r.dataset.contrast = "high"; else delete r.dataset.contrast;
+    if (p?.reduce_motion) r.dataset.motion = "reduced"; else delete r.dataset.motion;
+  });
+
+  // keep the screen on while playing, if asked
+  let lock: { release: () => Promise<void> } | null = null;
+  $effect(() => {
+    const want = !!store.s?.prefs.keep_awake && player.s.playing;
+    const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+    if (want && !lock && wl) wl.request("screen").then((l) => (lock = l)).catch(() => {});
+    if (!want && lock) { lock.release().catch(() => {}); lock = null; }
+  });
+
+  // sleep timer: pause when it runs out
+  onMount(() => {
+    const id = setInterval(() => {
+      if (ui.sleepEnd && Date.now() >= ui.sleepEnd) { ui.sleepEnd = null; if (player.s.playing) actions.toggle(); }
+    }, 1000);
+    return () => clearInterval(id);
   });
 
   // seek bar: only for files whose length is known (live radio cannot be seeked)
@@ -38,6 +69,7 @@
 {/if}
 
 <VideoPlayer />
+<NowPlaying />
 
 <div class="shell">
   <header>
@@ -79,9 +111,9 @@
   </main>
 
   <footer>
-    <div class="np">
+    <button class="np" aria-label="Open the full player" onclick={() => (ui.np = true)}>
       {#if player.s.current}<b>{player.s.current.title}</b><span>{player.s.current.subtitle}</span>{:else}<span>Nothing playing</span>{/if}
-    </div>
+    </button>
     <div class="tx">
       <button class="btn" onclick={actions.toggle}>{player.s.playing ? "Pause" : "Play"}</button>
       <button class="btn" onclick={actions.next}>Next</button>
@@ -115,7 +147,7 @@
   .navbtn.on{background:#1FA8FF18;color:var(--lblue)}
   main{padding:20px;overflow:auto}
   footer{grid-column:1/3;display:flex;align-items:center;gap:20px;padding:0 20px;border-top:1px solid var(--line);background:var(--panel)}
-  .np{display:flex;flex-direction:column;font-size:13px;min-width:200px}.np span{color:var(--muted)}
+  .np{display:flex;flex-direction:column;align-items:flex-start;text-align:left;font-size:13px;min-width:200px;border:0;background:transparent;color:inherit;padding:0;font-family:inherit}.np span{color:var(--muted)}
   .tx{display:flex;gap:8px}
   .seek{flex:1;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);min-width:0}.seek input{flex:1;min-width:80px}.vol{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
   .burger,.scrim{display:none}

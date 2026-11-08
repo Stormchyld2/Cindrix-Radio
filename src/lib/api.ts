@@ -6,7 +6,11 @@ export interface PlayerState { current: Track | null; queue: Track[]; playing: b
 export interface Folders { root: string; radio: string; music: string; podcasts: string; audiobooks: string; videos: string; recordings: string }
 
 export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[]; vocal_reduction: number }
-export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings; grid_down: boolean }
+export interface Prefs { text_scale: number; accent: string; high_contrast: boolean; reduce_motion: boolean; skip_back: number; skip_fwd: number; auto_refresh_podcasts: boolean; radio_country: string | null; radio_order: string | null; keep_awake: boolean }
+export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings; grid_down: boolean; pause_on_disconnect: boolean; prefs: Prefs; download_root: string | null }
+export interface StorageRow { label: string; path: string; bytes: number }
+export interface BackupInfo { name: string; bytes: number; made: number }
+export interface Diagnostics { version: string; os: string; arch: string; data_dir: string; save_root: string; library_items: number; private_build: boolean }
 
 export interface Episode { guid: string; title: string; enclosure_url: string; published: string | null; duration_secs: number | null; file: string | null; played: boolean }
 export interface Feed { id: string; url: string; title: string; image: string | null; episodes: Episode[] }
@@ -37,11 +41,23 @@ let mock: PlayerState = { current: null, queue: [], playing: false, position_sec
 const call = async <T>(cmd: string, args: Record<string, unknown> = {}, fb: () => T): Promise<T> =>
   inTauri ? invoke<T>(cmd, args) : fb();
 
-let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_down: false, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0), vocal_reduction: 0 } };
+const defaultPrefs: Prefs = { text_scale: 1, accent: "blue", high_contrast: false, reduce_motion: false, skip_back: 15, skip_fwd: 30, auto_refresh_podcasts: true, radio_country: null, radio_order: null, keep_awake: false };
+let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_down: false, pause_on_disconnect: true, prefs: defaultPrefs, download_root: null, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0), vocal_reduction: 0 } };
 
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  storageReport: () => call<StorageRow[]>("storage_report", {}, () => []),
+  setPrefs: (prefs: Prefs) => call<Settings>("set_prefs", { prefs }, () => (mockSettings = { ...mockSettings, prefs })),
+  setPauseOnDisconnect: (on: boolean) => call<Settings>("set_pause_on_disconnect", { on }, () => (mockSettings = { ...mockSettings, pause_on_disconnect: on })),
+  setDownloadRoot: (path: string | null) => call<Settings>("set_download_root", { path }, () => (mockSettings = { ...mockSettings, download_root: path })),
+  privacyClear: (what: "history" | "lyrics" | "library") => call<void>("privacy_clear", { what }, () => undefined),
+  backupMake: () => call<BackupInfo>("backup_make", {}, desktopOnly),
+  backupList: () => call<BackupInfo[]>("backup_list", {}, () => []),
+  backupRestore: (name: string) => call<number>("backup_restore", { name }, desktopOnly),
+  backupDelete: (name: string) => call<void>("backup_delete", { name }, desktopOnly),
+  diagnostics: () => call<Diagnostics>("diagnostics", {}, () => ({ version: "browser", os: "browser", arch: "", data_dir: "", save_root: "", library_items: 0, private_build: false })),
+  openBluetooth: () => call<void>("open_bluetooth_settings", {}, () => undefined),
   radioStations: () => call<Station[]>("radio_stations", {}, () => []),
   radioAdd: (station: Station) => call<Station[]>("radio_add", { station }, desktopOnly),
   radioRemove: (id: string) => call<Station[]>("radio_remove", { id }, desktopOnly),

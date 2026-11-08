@@ -14,7 +14,15 @@ pub struct Folders {
     pub recordings: String,
 }
 
+static ROOT_OVERRIDE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// A user-chosen save location replacing Downloads/Cindrix (applied at startup).
+pub fn set_root_override(p: Option<String>) {
+    *ROOT_OVERRIDE.lock().unwrap() = p.filter(|s| !s.trim().is_empty());
+}
+
 fn downloads_root() -> PathBuf {
+    if let Some(p) = ROOT_OVERRIDE.lock().unwrap().clone() { return PathBuf::from(p); }
     #[cfg(target_os = "android")]
     return PathBuf::from("/storage/emulated/0/Download/Cindrix");
     #[cfg(not(target_os = "android"))]

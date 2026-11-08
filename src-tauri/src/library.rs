@@ -193,6 +193,15 @@ impl LibraryStore {
         self.save(&d);
     }
 
+    /// Forget the scanned index (sources are kept); a rescan rebuilds it.
+    pub fn clear_index(&self) {
+        let mut d = self.data.lock().unwrap();
+        d.items.clear();
+        self.save(&d);
+    }
+
+    pub fn item_count(&self) -> usize { self.data.lock().unwrap().items.len() }
+
     pub fn source_list(&self) -> Vec<Source> { self.data.lock().unwrap().sources.clone() }
 
     pub fn statuses(&self) -> Vec<SourceStatus> {

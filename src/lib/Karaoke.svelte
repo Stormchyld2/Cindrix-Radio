@@ -39,8 +39,13 @@
     text = null;
     if (path && on) api.lyricsGet(path).then((t) => { if (player.s.current?.path === path) text = t; }).catch(() => {});
   });
+  // Full screen works everywhere as an overlay; on desktop it also asks the window for real full screen.
+  let soft = $state(false);
+  let size = $state(26);
   async function toggleFull() {
-    try { if (document.fullscreenElement) await document.exitFullscreen(); else await stageEl?.requestFullscreen(); } catch { /* not allowed here */ }
+    soft = !soft;
+    if (isAndroid) return;
+    try { if (!soft && document.fullscreenElement) await document.exitFullscreen(); else if (soft) await stageEl?.requestFullscreen(); } catch { /* not allowed here */ }
   }
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -103,10 +108,10 @@
     {/each}
   </div>
 {:else}
-  <div class="stage" class:full bind:this={stageEl}>
+  <div class="stage" class:full={full || soft} bind:this={stageEl}>
     <div class="lyr">
       {#if lyricsOn && text}
-        <pre>{text}</pre>
+        <pre style="font-size:{size}px">{text}</pre>
       {:else if lyricsOn}
         <div class="banner"><img src="/logo.png" alt="Cindrix Radio" /><p>No lyrics added for this song.</p>
           {#if inTauri && player.s.current?.path}<button class="btn" onclick={() => openEditor(player.s.current?.path, player.s.current?.title)}>Add my lyrics</button>{/if}</div>
@@ -127,7 +132,9 @@
         <button class="btn" onclick={actions.next}>Next</button>
         <label class="vol">Vol <input type="range" min="0" max="1" step="0.01" value={player.s.volume} aria-label="Volume" oninput={(e) => actions.volume(Number(e.currentTarget.value))} /></label>
         <span class="sp"></span>
-        <button class="btn" onclick={toggleFull}>{full ? "Exit full screen" : "Full screen"}</button>
+        <button class="btn" aria-label="Smaller lyrics" onclick={() => (size = Math.max(16, size - 4))}>A−</button>
+        <button class="btn" aria-label="Bigger lyrics" onclick={() => (size = Math.min(64, size + 4))}>A+</button>
+        <button class="btn" onclick={toggleFull}>{full || soft ? "Exit full screen" : "Full screen"}</button>
         <button class="btn" onclick={() => (view = "pick")}>Songs</button>
       </div>
     </div>
@@ -169,7 +176,7 @@
   .meta{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .meta span{color:var(--muted);font-size:12px}
   .stage{display:flex;flex-direction:column;gap:12px;height:calc(100vh - 170px);min-height:420px}
-  .stage.full{height:100vh;padding:20px;background:var(--bg,#0A0E13)}
+  .stage.full{position:fixed;inset:0;z-index:40;height:auto;min-height:0;padding:20px;background:var(--bg,#0A0E13)}
   .lyr{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px;display:flex}
   .lyr pre{margin:auto;font:600 clamp(22px,3.2vw,40px)/1.5 Rajdhani,Inter,sans-serif;text-align:center;white-space:pre-wrap;color:var(--silver)}
   .banner{margin:auto;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px}

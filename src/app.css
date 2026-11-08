@@ -9,3 +9,10 @@ h1,h2,h3{font-family:Rajdhani,sans-serif;margin:0;color:#F1F4F8}
 .btn{height:36px;padding:0 14px;border-radius:10px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:13px}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#04121C;font-weight:600}
 .scroll-y{overflow-y:auto}
+
+:root[data-accent=green]{--blue:#2FD08A;--lblue:#8FF0C4}
+:root[data-accent=amber]{--blue:#F5B43C;--lblue:#FFD98A}
+:root[data-accent=violet]{--blue:#A78BFA;--lblue:#C9B8FF}
+:root[data-contrast=high]{--silver:#FFFFFF;--muted:#C4CED9;--line:#4A5D72}
+:root[data-motion=reduced] *{transition:none!important;animation:none!important}
+#app{zoom:var(--scale,1);height:calc(100% / var(--scale,1))}

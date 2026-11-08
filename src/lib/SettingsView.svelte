@@ -2,10 +2,23 @@
   import Equalizer from "./Equalizer.svelte";
   import Legal from "./Legal.svelte";
   import Sources from "./Sources.svelte";
+  import Appearance from "./pages/Appearance.svelte";
+  import PlaybackPage from "./pages/PlaybackPage.svelte";
+  import Devices from "./pages/Devices.svelte";
+  import PodcastsPage from "./pages/PodcastsPage.svelte";
+  import RadioPage from "./pages/RadioPage.svelte";
+  import AudiobooksPage from "./pages/AudiobooksPage.svelte";
+  import LanPage from "./pages/LanPage.svelte";
+  import StoragePage from "./pages/StoragePage.svelte";
+  import PrivacyPage from "./pages/PrivacyPage.svelte";
+  import BackupPage from "./pages/BackupPage.svelte";
+  import AdvancedPage from "./pages/AdvancedPage.svelte";
+  import About from "./pages/About.svelte";
   import { store, settingsActions } from "./settings.svelte";
 
   // Subtabs are added here as each is built; the full list is in docs/010.
-  const tabs = ["General", "Audio & Equalizer", "Library & Sources", "Karaoke & Lyrics", "Legal"] as const;
+  const tabs = ["General", "Appearance", "Playback", "Audio & Equalizer", "Devices & Bluetooth", "Library & Sources", "Podcasts", "Internet Radio", "Audiobooks",
+    "Karaoke & Lyrics", "LAN & Sharing", "Downloads & Storage", "Privacy & Security", "Backup & Restore", "Advanced & Diagnostics", "About", "Legal"] as const;
   let tab = $state<(typeof tabs)[number]>("General");
 </script>
 
@@ -29,6 +42,30 @@
           what is on your drives and in your downloads. It also saves power. Switching never stops what is playing.
         </p>
       </div>
+    {:else if tab === "Appearance"}
+      <Appearance />
+    {:else if tab === "Playback"}
+      <PlaybackPage />
+    {:else if tab === "Devices & Bluetooth"}
+      <Devices />
+    {:else if tab === "Podcasts"}
+      <PodcastsPage />
+    {:else if tab === "Internet Radio"}
+      <RadioPage />
+    {:else if tab === "Audiobooks"}
+      <AudiobooksPage />
+    {:else if tab === "LAN & Sharing"}
+      <LanPage />
+    {:else if tab === "Downloads & Storage"}
+      <StoragePage />
+    {:else if tab === "Privacy & Security"}
+      <PrivacyPage />
+    {:else if tab === "Backup & Restore"}
+      <BackupPage />
+    {:else if tab === "Advanced & Diagnostics"}
+      <AdvancedPage />
+    {:else if tab === "About"}
+      <About />
     {:else if tab === "Audio & Equalizer"}
       <Equalizer />
     {:else if tab === "Library & Sources"}

@@ -29,8 +29,8 @@
   const sorts = [["votes", "Most voted"], ["clickcount", "Most played"], ["clicktrend", "Trending"], ["bitrate", "Best quality"], ["name", "A to Z"]];
   const countries = [["", "Any country"], ["US", "United States"], ["CA", "Canada"], ["GB", "United Kingdom"], ["AU", "Australia"]];
   let tag = $state<string | null>(null);
-  let order = $state("votes");
-  let country = $state("");
+  let order = $state(store.s?.prefs.radio_order ?? "votes");
+  let country = $state(store.s?.prefs.radio_country ?? "");
   const cat = $derived(cats.find((c) => c.label === tag));
   let saved = $state<Station[]>([]);
   let found = $state<Station[]>([]);
