@@ -6,6 +6,7 @@ mod meta;
 mod paths;
 mod podcasts;
 mod player;
+mod playlists;
 mod radio;
 mod settings;
 mod stream;
@@ -22,6 +23,7 @@ use podcasts::{Feed, PodStore};
 use serde::Serialize;
 use tauri::State;
 use videos::{VideoHit, VideoSource};
+use playlists::{Data as PlaylistData, PlaylistStore};
 
 pub struct AppSettings {
     pub inner: Mutex<settings::Settings>,
@@ -296,6 +298,23 @@ fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, g
 }
 
 #[tauri::command]
+fn playlists_get(p: State<PlaylistStore>) -> PlaylistData { p.get() }
+#[tauri::command]
+fn playlist_create(p: State<PlaylistStore>, name: String) -> PlaylistData { p.create(&name) }
+#[tauri::command]
+fn playlist_rename(p: State<PlaylistStore>, id: String, name: String) -> PlaylistData { p.rename(&id, &name) }
+#[tauri::command]
+fn playlist_delete(p: State<PlaylistStore>, id: String) -> PlaylistData { p.delete(&id) }
+#[tauri::command]
+fn playlist_add(p: State<PlaylistStore>, id: String, track: Track) -> PlaylistData { p.add(&id, track) }
+#[tauri::command]
+fn playlist_remove(p: State<PlaylistStore>, id: String, index: usize) -> PlaylistData { p.remove(&id, index) }
+#[tauri::command]
+fn playlist_shift(p: State<PlaylistStore>, id: String, index: usize, delta: i32) -> PlaylistData { p.shift(&id, index, delta) }
+#[tauri::command]
+fn favorite_toggle(p: State<PlaylistStore>, track: Track) -> PlaylistData { p.toggle_favorite(track) }
+
+#[tauri::command]
 fn video_sources() -> Vec<VideoSource> { videos::sources() }
 
 #[tauri::command]
@@ -426,6 +445,7 @@ pub fn run() {
             let _ = paths::ensure(&folders);
             lib.ensure_builtin(&folders.root);
             app.manage(lib);
+            app.manage(PlaylistStore::load(std::path::PathBuf::from(&folders.root).join("Playlists").join("playlists.json")));
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             Ok(())
@@ -439,6 +459,7 @@ pub fn run() {
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
+            playlists_get, playlist_create, playlist_rename, playlist_delete, playlist_add, playlist_remove, playlist_shift, favorite_toggle,
             video_sources, video_search, video_download, ytdl_status, ytdl_install
         ])
         .run(tauri::generate_context!())

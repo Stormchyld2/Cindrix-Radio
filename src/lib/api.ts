@@ -20,6 +20,8 @@ export interface Page { items: LibItem[]; total: number }
 export interface AlbumRow { album: string; artist: string; count: number }
 export interface Counts { music: number; podcast: number; audiobook: number; video: number }
 
+export interface Playlist { id: string; name: string; items: Track[] }
+export interface PlaylistData { playlists: Playlist[]; favorites: Track[] }
 export interface VideoHit { id: string; source: string; title: string; channel: string; duration_secs: number | null; thumbnail: string | null; page_url: string; embed_url: string | null }
 export interface VideoSource { id: string; label: string; can_download: boolean }
 
@@ -48,6 +50,14 @@ export const api = {
     call<Station[]>("radio_search", { query, tags, order, country, limit, offset }, () => []),
   radioPlay: (station: Station) => call<PlayerState>("radio_play", { station }, desktopOnly),
   radioRecord: (start: boolean, name: string) => call<string | null>("radio_record", { start, name }, desktopOnly),
+  playlistsGet: () => call<PlaylistData>("playlists_get", {}, () => ({ playlists: [], favorites: [] })),
+  playlistCreate: (name: string) => call<PlaylistData>("playlist_create", { name }, desktopOnly),
+  playlistRename: (id: string, name: string) => call<PlaylistData>("playlist_rename", { id, name }, desktopOnly),
+  playlistDelete: (id: string) => call<PlaylistData>("playlist_delete", { id }, desktopOnly),
+  playlistAdd: (id: string, track: Track) => call<PlaylistData>("playlist_add", { id, track }, desktopOnly),
+  playlistRemove: (id: string, index: number) => call<PlaylistData>("playlist_remove", { id, index }, desktopOnly),
+  playlistShift: (id: string, index: number, delta: number) => call<PlaylistData>("playlist_shift", { id, index, delta }, desktopOnly),
+  favoriteToggle: (track: Track) => call<PlaylistData>("favorite_toggle", { track }, desktopOnly),
   videoSources: () => call<VideoSource[]>("video_sources", {}, () => []),
   videoSearch: (source: string, query: string, limit: number, offset: number) => call<VideoHit[]>("video_search", { source, query, limit, offset }, () => []),
   videoDownload: (hit: VideoHit) => call<string>("video_download", { hit }, desktopOnly),

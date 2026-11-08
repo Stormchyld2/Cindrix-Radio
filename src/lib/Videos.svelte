@@ -3,6 +3,7 @@
   import { api, type LibItem, type VideoHit, type VideoSource } from "./api";
   import { store, settingsActions } from "./settings.svelte";
   import { videoActions } from "./video.svelte";
+  import AddMenu from "./AddMenu.svelte";
 
   let sources = $state<VideoSource[]>([]);
   let source = $state("archive");
@@ -115,6 +116,7 @@
         <button class="play" disabled={!i.available} aria-label="Play {i.title}" onclick={() => playMine(i)}>▶</button>
         <div class="meta"><b>{i.title}</b><span>{i.group}</span></div>
         {#if !i.available}<span class="note">Unavailable</span>{/if}
+        <AddMenu track={{ id: i.id, title: i.title, subtitle: i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path }} />
       </div>
     {/each}
   </div>

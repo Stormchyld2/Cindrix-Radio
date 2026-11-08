@@ -3,6 +3,7 @@
   import { api, type AlbumRow, type Counts, type Kind, type LibItem } from "./api";
   import { actions } from "./player.svelte";
   import { videoActions } from "./video.svelte";
+  import AddMenu from "./AddMenu.svelte";
 
   const types: { kind: Kind; label: string; key: keyof Counts }[] = [
     { kind: "Music", label: "Music", key: "music" },
@@ -120,6 +121,7 @@
         <div class="meta"><b>{i.title}</b><span>{[i.artist || i.group, i.album].filter(Boolean).join(" · ")}</span></div>
         {#if !i.available}<span class="tag">Unavailable</span>{/if}
         <span class="time">{fmt(i.duration_secs)}</span>
+        <AddMenu track={toTrack(i)} />
         <button class="btn" disabled={!playable(i)} onclick={() => actions.enqueue(toTrack(i))}>+ Queue</button>
       </div>
     {/each}
