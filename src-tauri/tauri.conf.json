@@ -13,7 +13,7 @@
     "windows": [
       { "title": "Cindrix Radio", "width": 1440, "height": 900, "minWidth": 1024, "minHeight": 700 }
     ],
-    "security": { "csp": null }
+    "security": { "csp": null, "assetProtocol": { "enable": true, "scope": ["**"] } }
   },
   "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.png"] }
 }

@@ -25,6 +25,8 @@ jobs:
       - run: npm install
       - run: npx tauri icon public/logo.png
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+      # production configuration: the YouTube helper must compile out cleanly
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --no-default-features
       - run: npx tauri build --no-bundle
       - name: Upload Windows exe
         uses: actions/upload-artifact@v4

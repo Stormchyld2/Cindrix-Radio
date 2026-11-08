@@ -8,6 +8,8 @@
   import Podcasts from "./lib/Podcasts.svelte";
   import Library from "./lib/Library.svelte";
   import Radio from "./lib/Radio.svelte";
+  import Videos from "./lib/Videos.svelte";
+  import VideoPlayer from "./lib/VideoPlayer.svelte";
   import TermsGate from "./lib/TermsGate.svelte";
   import { store, settingsActions, TERMS_VERSION } from "./lib/settings.svelte";
 
@@ -18,7 +20,7 @@
     folders = await api.folders();
   });
 
-  const nav = ["Dashboard", "Library", "Radio", "Podcasts", "Playlists", "Favorites", "Settings"];
+  const nav = ["Dashboard", "Library", "Radio", "Podcasts", "Videos", "Playlists", "Favorites", "Settings"];
   let active = $state("Dashboard");
   const inTauri = "__TAURI_INTERNALS__" in window;
   async function playFile() {
@@ -36,6 +38,8 @@
 {#if store.s && store.s.terms_version !== TERMS_VERSION}
   <TermsGate />
 {/if}
+
+<VideoPlayer />
 
 <div class="shell">
   <header>
@@ -63,6 +67,8 @@
       <Library />
     {:else if active === "Podcasts"}
       <Podcasts />
+    {:else if active === "Videos"}
+      <Videos />
     {:else}
     <div class="cols">
       <section class="left">

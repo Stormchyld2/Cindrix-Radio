@@ -20,6 +20,9 @@ export interface Page { items: LibItem[]; total: number }
 export interface AlbumRow { album: string; artist: string; count: number }
 export interface Counts { music: number; podcast: number; audiobook: number; video: number }
 
+export interface VideoHit { id: string; source: string; title: string; channel: string; duration_secs: number | null; thumbnail: string | null; page_url: string; embed_url: string | null }
+export interface VideoSource { id: string; label: string; can_download: boolean }
+
 export interface Station { id: string; name: string; url: string; favicon: string | null; tags: string | null; country: string | null; codec: string | null; bitrate: number | null; rb_uuid: string | null }
 export interface StreamInfo { url: string; name: string | null; genre: string | null; bitrate: number | null; content_type: string | null }
 export interface ImportStations { stations: Station[]; added: number }
@@ -45,6 +48,11 @@ export const api = {
     call<Station[]>("radio_search", { query, tags, order, country, limit, offset }, () => []),
   radioPlay: (station: Station) => call<PlayerState>("radio_play", { station }, desktopOnly),
   radioRecord: (start: boolean, name: string) => call<string | null>("radio_record", { start, name }, desktopOnly),
+  videoSources: () => call<VideoSource[]>("video_sources", {}, () => []),
+  videoSearch: (source: string, query: string, limit: number, offset: number) => call<VideoHit[]>("video_search", { source, query, limit, offset }, () => []),
+  videoDownload: (hit: VideoHit) => call<string>("video_download", { hit }, desktopOnly),
+  ytdlStatus: () => call<string | null>("ytdl_status", {}, () => null),
+  ytdlInstall: () => call<string>("ytdl_install", {}, desktopOnly),
   libSources: () => call<SourceStatus[]>("library_sources", {}, () => []),
   libAddSource: (path: string, kinds: Kind[]) => call<SourceStatus[]>("library_add_source", { path, kinds }, desktopOnly),
   libRemoveSource: (id: string) => call<SourceStatus[]>("library_remove_source", { id }, desktopOnly),

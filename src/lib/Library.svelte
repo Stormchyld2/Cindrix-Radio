@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { api, type AlbumRow, type Counts, type Kind, type LibItem } from "./api";
   import { actions } from "./player.svelte";
+  import { videoActions } from "./video.svelte";
 
   const types: { kind: Kind; label: string; key: keyof Counts }[] = [
     { kind: "Music", label: "Music", key: "music" },
@@ -43,6 +44,7 @@
 
   const toTrack = (i: LibItem) => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
   const playable = (i: LibItem) => i.kind !== "Video" && i.available;
+  const start = (i: LibItem) => (i.kind === "Video" ? videoActions.open({ title: i.title, file: i.path }) : actions.play(toTrack(i)));
   async function shuffle() {
     const p = await api.libSearch(query, kind, genre, artist, album, 2000, 0);
     const pool = p.items.filter(playable);
@@ -114,7 +116,7 @@
   <div class="rows">
     {#each items as i (i.id)}
       <div class="row" class:off={!i.available}>
-        <button class="play" disabled={!playable(i)} title={i.kind === "Video" ? "Video playback comes with the video player" : i.available ? "Play" : "Drive not connected"} aria-label="Play {i.title}" onclick={() => actions.play(toTrack(i))}>▶</button>
+        <button class="play" disabled={!i.available} title={i.available ? "Play" : "Drive not connected"} aria-label="Play {i.title}" onclick={() => start(i)}>▶</button>
         <div class="meta"><b>{i.title}</b><span>{[i.artist || i.group, i.album].filter(Boolean).join(" · ")}</span></div>
         {#if !i.available}<span class="tag">Unavailable</span>{/if}
         <span class="time">{fmt(i.duration_secs)}</span>

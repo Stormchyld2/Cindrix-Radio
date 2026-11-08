@@ -9,6 +9,7 @@ mod player;
 mod radio;
 mod settings;
 mod stream;
+mod videos;
 
 use player::{Player, PlayerState, Track};
 use std::sync::Mutex;
@@ -20,6 +21,7 @@ use radio::{Station, StationStore};
 use podcasts::{Feed, PodStore};
 use serde::Serialize;
 use tauri::State;
+use videos::{VideoHit, VideoSource};
 
 pub struct AppSettings {
     pub inner: Mutex<settings::Settings>,
@@ -294,6 +296,42 @@ fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, g
 }
 
 #[tauri::command]
+fn video_sources() -> Vec<VideoSource> { videos::sources() }
+
+#[tauri::command]
+async fn video_search(app: tauri::AppHandle, settings: State<'_, AppSettings>, source: String, query: String, limit: u32, offset: u32) -> Result<Vec<VideoHit>, String> {
+    use tauri::Manager;
+    online_or_err(&settings)?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    blocking(move || videos::search(&dir, &source, &query, limit.clamp(1, 40), offset)).await
+}
+
+/// Save a search result for offline viewing. Returns the saved path.
+#[tauri::command]
+async fn video_download(app: tauri::AppHandle, settings: State<'_, AppSettings>, hit: VideoHit) -> Result<String, String> {
+    use tauri::Manager;
+    online_or_err(&settings)?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let root = std::path::PathBuf::from(paths::default_folders().videos);
+    blocking(move || videos::download(&dir, &hit, &root).map(|p| p.to_string_lossy().into_owned())).await
+}
+
+/// The installed YouTube helper version, or None when it is missing or not in this build.
+#[tauri::command]
+fn ytdl_status(app: tauri::AppHandle) -> Option<String> {
+    use tauri::Manager;
+    videos::ytdl_version(&app.path().app_data_dir().ok()?)
+}
+
+#[tauri::command]
+async fn ytdl_install(app: tauri::AppHandle, settings: State<'_, AppSettings>) -> Result<String, String> {
+    use tauri::Manager;
+    online_or_err(&settings)?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    blocking(move || videos::ytdl_install(&dir)).await
+}
+
+#[tauri::command]
 fn library_artists(lib: State<LibraryStore>, kind: Option<Kind>, query: String) -> Vec<(String, usize)> { lib.artists(kind, &query) }
 
 #[tauri::command]
@@ -400,7 +438,8 @@ pub fn run() {
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_search, library_genres, library_counts, library_artists, library_albums,
-            radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record
+            radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
+            video_sources, video_search, video_download, ytdl_status, ytdl_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");
