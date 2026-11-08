@@ -1,0 +1,137 @@
+# 009 — Implementation Contracts, Cross-Platform Parity and Release Gates
+
+**Status:** Approved implementation requirements and traceability addendum  
+**Date:** 2026-11-07  
+**Scope:** Cindrix Radio — Windows and Android
+
+This document supplements, rather than replaces, 001–008. It resolves how approved behaviors must be tested, integrated and presented. It does **not** claim any implementation exists.
+
+## 1. Non-negotiable product contract
+
+- Run in **Online**, **LAN Only**, and **Device Offline** states. Check source-specific reachability; Wi-Fi does not imply internet access.
+- A user-owned local file plays with no internet, LAN, account, cloud, or AI dependencies.
+- Persistent media is never copied, transcoded, deleted or mutated without an authorized operation. An imported path is a reference by default.
+- The music default is **1.0 second of deliberate silence between discrete tracks**; gapless/other duration is user-selectable. Do not impose this on uninterrupted radio audio or a continuous audiobook/episode.
+- Exactly one user-selected system-supported Bluetooth audio output is the baseline requirement. On disconnect, prefer pause over surprise speaker fallback.
+- Provide **10-band graphic equalizer**, ReplayGain/normalization, named presets, and mixer-like faders/knobs; distinguish active blue controls from orange warning accents.
+- Provide user playlists and rule-driven smart playlists, podcast subscriptions/OPML, internet radio favorites and manual URLs, audiobook bookmarks/progress, authorized stream recording, playback history, Car Mode, two optional external widgets, and an always-present mini-player.
+- **Audio Sharing** distributes only explicitly selected existing files/streams to trusted LAN clients; it is not a live microphone broadcast studio or multi-source production mixer. Scheduled *capture* of a permitted radio stream is different from scheduled broadcasting.
+- **Karaoke:** best practical local lead-vocal attenuation/near-removal with manually scrollable plain lyrics; no sync requirement; original unchanged; **no persistent processed songs/stems by default**. Temporary data must be bounded, disposable and recovered after crashes.
+- No mandatory ads, analytics, sign-in, cloud account or third-party audio storage.
+
+## 2. Network mode and capability contract
+
+| Capability | Online | LAN Only | Device Offline |
+|---|---|---|---|
+| Own local music, audiobook, recording, downloaded episode | Yes | Yes | Yes |
+| Local metadata, playlist, resume, EQ, lyrics and karaoke | Yes | Yes | Yes |
+| Saved reachable LAN file or share | When connected to LAN | Yes | No |
+| Share selected local audio with LAN clients | When connected to LAN | Yes | No |
+| Internet-only station stream | If station reachable | Unavailable | Unavailable |
+| RSS subscription refresh and episode downloading | If feed reachable | Unavailable | Unavailable |
+| Previously downloaded podcast episode | Yes | Yes | Yes |
+| Optional internet-to-LAN relay | When upstream stream and rights allow | Unavailable without upstream | Unavailable |
+
+Each item stores **source availability** independently from identity. UI statuses include Available, Cached/Downloaded, Stale, Missing, Unauthorized, Buffering, Unavailable and Retry. An unavailable stream is never presented as playable because a historical catalog entry exists.
+
+A host can have concurrent internet and LAN connectivity. The three user-facing states are simplified capability summaries, not a restriction on independent reachability tests.
+
+## 3. Playback and shared session contract
+
+Exactly one playback coordinator owns playing/paused/buffering/seeking/stopped state, queue, seek position, route, output level, repeat/shuffle and interruption state. All screens, widgets, notifications and platform transport controls dispatch commands to that coordinator. UI controls must not create a second player.
+
+For local files, a deterministic elapsed-time test verifies the one-second default gap, excluding decode/preload delay. Gapless must be gapless at an audio-sample or perceptual continuity level (tested with reference material), not only an instantaneous UI transition. Episodes and audiobooks persist position per item/chapter; radio live streams distinguish a nonseekable timeline. Resume must survive unexpected process shutdown.
+
+Use backoff and bounded stream buffers, explicit Stop semantics, device-change handling and output-interruption policy. DSP must maintain responsiveness during karaoke processing, download, scanning and network transitions.
+
+## 4. LAN discovery and source-sharing contract
+
+A trusted LAN can be Wi-Fi, Ethernet, or phone hotspot with **zero internet**. Implement discovery where available and a manual entry fallback (IP/host, port, path, protocol). Do not make mDNS multicast a prerequisite.
+
+Never share the device's filesystem wholesale. User must select collections or tracks, explicitly start sharing, see address/listeners/activity, revoke permissions, and Stop Sharing in one action. Read-only stream endpoints use sanitized IDs/path resolution, HTTP Range/seek when practical, and access controls appropriate to the selected network. Do not relay externally licensed station streams unless rights permit.
+
+Test bidirectional Windows/Android cases where supported, two-device isolated hotspots, IP-only connectivity, network reconnection, denial for unshared files and large-file seeking.
+
+## 5. Audio processing and karaoke contract
+
+Primary normal playback runs the original decoded signal. Vocal removal is optional and opt-in per karaoke session. Evaluate strong **on-device** stem separation candidates with model license, model size, CPU/RAM and battery requirements, processing delay, audible quality and failure fallback. Algorithm/framework selection is an open engineering decision; neither near-perfect elimination nor realtime performance is guaranteed on all Android devices.
+
+Expose Original / Reduce / Attempt Removal with accurate control labeling. A vocal fader controls the *vocal stem* only when actual separated stems are available; center-channel attenuation uses the label **Reduction strength**. Lyrics can be embedded, sidecar or user-entered and must display as plain scalable, manually scrollable text without timecodes or mandatory synchronization.
+
+**Storage invariant:** the original stays unchanged; processing cannot create persistent output tracks, saved instrumentals or duplicated media library entries. Prefer bounded RAM; any temporary disk workspace is limited, process-private and removed on normal exit, cancel, next track and startup recovery. If preprocessing needs too many resources, display a transparent delay/fallback and allow Cancel. A temporary storage override is not silently enabled.
+
+## 6. Portable media, IDs and backups
+
+Store authoritative profiles, playlists, subscriptions, downloaded-episode metadata, bookmarks, track references, lyrics references, EQ presets and state in versioned portable files. Use stable IDs that survive rename/move where identity remains established. Indexes and caches may be discarded and rebuilt. Treat external removable media as offline, not deleted, until explicitly reconciled. Duplicates must never be automatically deleted.
+
+Atomic writes, previous-version backup on risky mutations, bounded logs, safe schema migrations and recovery tests are mandatory. Explicitly distinguish backup of **metadata only** from user-requested copying of large audio files.
+
+## 7. Windows–Android parity table
+
+| Behavior | Windows | Android | Gate |
+|---|---|---|---|
+| Local/offline playback, queues and bookmarks | Required | Required | Physical device smoke test |
+| Music gap / gapless setting | Required | Required | Audio continuity test |
+| 10-band EQ, loudness and karaoke | Required with device-based fallback | Required with device-based fallback | Real CPU, thermal, sample rate tests |
+| Background and lock-screen media controls | Tray/media integration | Foreground playback service / MediaSession | OS policy validation |
+| Output routing | Wired/system/Bluetooth | Android audio focus, wired/Bluetooth | Disconnection and focus interruption |
+| Isolated-LAN receive and sharing | Required | Required subject to OS background restrictions | Two-device test in both directions |
+| Podcast/radio and downloads | Required | Required | No-WAN degradation tests |
+| Now Playing and Favorites widgets | Desktop widget/floating surface where supported | Native home-screen widgets | Same coordinator and state |
+| Car Mode | Simplified controls | Simplified controls and OS policy compliance | Usability test |
+
+The UI can adapt to form factor; capability gaps must be labeled, not concealed. No assumption that Android or Windows offers equivalent media, Bluetooth or notification API behavior.
+
+## 8. Acceptance checklist
+
+### Storage and identity
+- [ ] No file copying during normal folder import.
+- [ ] Folder rename/remount retains references or offers a non-destructive relink.
+- [ ] Broken/corrupt metadata is reported, not silently overwritten.
+- [ ] Backup/export/restore preserves playlist order, listening position, subscriptions and EQ preferences.
+
+### Playback
+- [ ] Music plays with Wi-Fi and mobile data disabled.
+- [ ] 1.0-second track gap measured; gapless selectable and tested.
+- [ ] Audiobook and podcast resume after kill/restart.
+- [ ] One Bluetooth speaker/headset works; disconnect does not unexpectedly play on speakers.
+- [ ] EQ and ReplayGain are safe from clipping/pops and survive restart.
+
+### Network and downloads
+- [ ] Offline, isolated hotspot, and internet conditions clearly differentiated.
+- [ ] Manual-IP LAN playback works without discovery.
+- [ ] LAN file seek and permissions validated with no internet.
+- [ ] Radio and RSS content unavailable offline unless cached/downloaded.
+- [ ] Download retries, checksum/integrity and quota/cleanup policies verified.
+
+### Karaoke
+- [ ] Original mode is unchanged.
+- [ ] Strongest viable on-device processing selected for the test platform, with quality/performance evidence.
+- [ ] Lyrics scroll without timestamps.
+- [ ] No persistent separated output after stop, cancel, crash, relaunch.
+- [ ] Processing does not freeze UI or exhaust storage; Cancel/fallback works.
+
+### Product delivery
+- [ ] Windows executable/build artifact and Android APK produced by reproducible CI.
+- [ ] OS media controls and Android background playback tested on physical devices.
+- [ ] Source and third-party codec/model licenses audited.
+- [ ] No mandatory cloud account, analytics, advertisements or internet at startup.
+- [ ] Versioned release notes distinguish implemented, tested, deferred and unsupported features.
+
+## 9. Repository implementation guidance
+
+Suggested separation (names may be reconciled with actual code when created):
+
+```text
+docs/                       approved scope and technical contracts
+images/logo.png              approved Cindrix Radio identity
+src/                         cross-platform UI and application/domain logic
+src-tauri/                   candidate Rust/Tauri desktop/mobile shell
+android/                     native media bridge only if chosen
+tests/                       playback, persistence, LAN and DSP validation
+.github/workflows/           source quality and target builds
+```
+
+Do not assume a framework choice is already approved: the Tauri 2 vs native Android service split remains pending platform proof of concept.
+
+**Decision record:** v1 product behaviors are approved; implementation/framework and third-party libraries require verification. This file does not override the more detailed specifications in 001–008.
