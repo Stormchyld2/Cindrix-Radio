@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { api, type Station } from "./api";
   import { actions } from "./player.svelte";
-  import { lists, listActions, playList, startTrack } from "./playlistStore.svelte";
+  import { lists, listActions, playList, startTrack, episodes, loadEpisodes, downloadEpisode } from "./playlistStore.svelte";
+  import { store } from "./settings.svelte";
   import { store } from "./settings.svelte";
 
   let stations = $state<Station[]>([]);
@@ -11,6 +12,7 @@
 
   onMount(async () => {
     listActions.load().catch((e) => (message = String(e)));
+    loadEpisodes().catch(() => {});
     stations = await api.radioStations();
   });
   async function guard(job: () => Promise<unknown>) {
@@ -50,6 +52,10 @@
       <div class="row">
         <button class="play" aria-label="Play {t.title}" onclick={() => guard(async () => { await startTrack(t); })}>▶</button>
         <div class="meta"><b>{t.title}</b><span>{[label(t.kind), t.subtitle].filter(Boolean).join(" · ")}</span></div>
+        {#if t.kind === "Podcast" && !t.path}
+          {#if episodes.by[t.id]?.file}<span class="tag">Downloaded</span>
+          {:else if episodes.by[t.id]}<button class="btn" hidden={gridDown} onclick={() => guard(() => downloadEpisode(t))}>Download</button>{/if}
+        {/if}
         <button class="ic on" title="Remove from Favorites" aria-label="Remove {t.title} from Favorites" onclick={() => guard(() => listActions.toggleFavorite(t))}>♥</button>
       </div>
     {/each}
@@ -72,5 +78,6 @@
   .play{width:36px;height:36px;border-radius:18px;border:0;background:var(--blue);color:#04121C;flex:none}
   .play:disabled{background:#2A3747;color:var(--muted)}
   .ic{width:32px;height:32px;border:0;background:transparent;color:var(--muted);font-size:18px}.ic.on{color:var(--blue)}
+  .tag{font-size:12px;color:var(--green)}
   button:disabled{opacity:.5;cursor:not-allowed}
 </style>

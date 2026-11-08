@@ -146,6 +146,18 @@ fn player_enqueue(p: State<Player>, track: Track) -> PlayerState {
     let mut s = p.0.lock().unwrap(); s.enqueue(track); s.clone()
 }
 
+/// Jump to a position in the current file. Live streams cannot be seeked.
+#[tauri::command]
+fn player_seek(p: State<Player>, e: State<Engine>, secs: u32) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    if s.current.as_ref().map_or(false, |t| t.path.is_some()) {
+        let to = s.current.as_ref().and_then(|t| t.duration_secs).map_or(secs, |d| secs.min(d.saturating_sub(1)));
+        e.seek(to);
+        s.position_secs = to;
+    }
+    s.clone()
+}
+
 #[tauri::command]
 fn player_volume(p: State<Player>, e: State<Engine>, volume: f32) -> PlayerState {
     let mut s = p.0.lock().unwrap();
@@ -486,7 +498,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_folders, player_state, player_play, player_toggle,
-            player_next, player_enqueue, player_volume,
+            player_next, player_enqueue, player_volume, player_seek,
             get_settings, set_vocal_reduction, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,

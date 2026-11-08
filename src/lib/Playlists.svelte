@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Playlist, Track } from "./api";
-  import { lists, listActions, playList, startTrack } from "./playlistStore.svelte";
+  import { lists, listActions, playList, startTrack, episodes, loadEpisodes, downloadEpisode } from "./playlistStore.svelte";
+  import { store } from "./settings.svelte";
 
   let openId = $state<string | null>(null);
   let creating = $state(false);
   let name = $state("");
   let renaming = $state(false);
   let message = $state<string | null>(null);
+  const gridDown = $derived(store.s?.grid_down ?? false);
   const cur = $derived(lists.d.playlists.find((p) => p.id === openId) ?? null);
 
-  onMount(() => { listActions.load().catch((e) => (message = String(e))); });
+  onMount(() => { listActions.load().catch((e) => (message = String(e)));
+    loadEpisodes().catch(() => {}); });
   async function guard(job: () => Promise<unknown>) {
     message = null;
     try { await job(); } catch (e) { message = String(e instanceof Error ? e.message : e); }
@@ -56,6 +59,10 @@
         <div class="row">
           <button class="play" aria-label="Play {t.title}" onclick={() => guard(async () => { await startTrack(t); })}>▶</button>
           <div class="meta"><b>{t.title}</b><span>{[label(t.kind), t.subtitle].filter(Boolean).join(" · ")}</span></div>
+          {#if t.kind === "Podcast" && !t.path}
+            {#if episodes.by[t.id]?.file}<span class="tag">Downloaded</span>
+            {:else if episodes.by[t.id]}<button class="btn" hidden={gridDown} onclick={() => guard(() => downloadEpisode(t))}>Download</button>{/if}
+          {/if}
           <button class="ic" aria-label="Move up" disabled={i === 0} onclick={() => guard(() => listActions.shift(cur.id, i, -1))}>↑</button>
           <button class="ic" aria-label="Move down" disabled={i === cur.items.length - 1} onclick={() => guard(() => listActions.shift(cur.id, i, 1))}>↓</button>
           <button class="btn" onclick={() => guard(() => listActions.removeAt(cur.id, i))}>Remove</button>
@@ -111,5 +118,6 @@
   .gate{position:fixed;inset:0;background:#000000CC;display:flex;align-items:center;justify-content:center;z-index:10}
   .box{width:min(420px,92vw);display:flex;flex-direction:column;gap:12px}
   .r{display:flex;justify-content:flex-end;gap:10px}
+  .tag{font-size:12px;color:var(--green)}
   button:disabled{opacity:.5;cursor:not-allowed}
 </style>

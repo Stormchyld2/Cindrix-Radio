@@ -100,5 +100,6 @@ export const api = {
     return (mock = n ? { ...mock, current: n, queue: rest, playing: true } : { ...mock, playing: false });
   }),
   enqueue: (track: Track) => call<PlayerState>("player_enqueue", { track }, () => (mock = { ...mock, queue: [...mock.queue, track] })),
+  seek: (secs: number) => call<PlayerState>("player_seek", { secs }, () => (mock = { ...mock, position_secs: secs })),
   volume: (volume: number) => call<PlayerState>("player_volume", { volume }, () => (mock = { ...mock, volume })),
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddMenu from "./AddMenu.svelte";
   import { onMount } from "svelte";
   import { api, type Feed, type Episode } from "./api";
   import { actions } from "./player.svelte";
@@ -102,6 +103,7 @@
         <button class="play" disabled={!e.file} title={e.file ? "Play" : "Download to play"} aria-label="Play {e.title}" onclick={() => play(open, e)}>▶</button>
         <div class="meta"><b>{e.title}</b><span>{e.published ?? ""} {fmt(e.duration_secs)}</span></div>
         {#if e.file}<span class="tag">Downloaded</span>{:else}<button class="btn" hidden={gridDown} disabled={!!busy} onclick={() => download(open, e)}>Download</button>{/if}
+        <AddMenu track={{ id: e.guid, title: e.title, subtitle: open.title, kind: "Podcast", duration_secs: e.duration_secs, path: e.file, url: e.file ? null : e.enclosure_url }} />
         <button class="btn" onclick={() => togglePlayed(open, e)}>{e.played ? "Mark unplayed" : "Mark played"}</button>
       </div>
     {/each}

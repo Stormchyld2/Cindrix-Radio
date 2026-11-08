@@ -12,5 +12,6 @@ export const actions = {
   toggle: async () => set(await api.toggle()),
   next: async () => set(await api.next()),
   enqueue: async (t: Track) => set(await api.enqueue(t)),
+  seek: async (secs: number) => set(await api.seek(secs)),
   volume: async (v: number) => set(await api.volume(v)),
 };
