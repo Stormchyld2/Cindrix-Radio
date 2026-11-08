@@ -1,5 +1,7 @@
 # 004 — Connectivity, LAN, Bluetooth and Audio Sharing
 
+> **Update 2026-11-08:** the LAN discovery, streaming, Audio Sharing, relay and sync sections below now belong to the separate **AirLink** app and are NOT built in Cindrix Radio. Only Online / Grid-Down modes remain (Grid-Down is enforced in the backend). Bluetooth output stays in scope, with full Android support planned (A2DP routing, MediaSession + foreground service, AVRCP metadata, audio focus, pause on disconnect, Android 12+ permission).
+
 ## Mandatory connectivity matrix
 | Network state | Local files | LAN sources | Internet podcast/radio |
 |---|---|---|---|

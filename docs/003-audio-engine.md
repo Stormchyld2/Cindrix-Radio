@@ -1,5 +1,7 @@
 # 003 — Audio Engine and DSP
 
+> **Update 2026-11-08:** LAN streams are out of scope here (AirLink). Built: rodio/symphonia playback, EQ, vocal reduction, seek, HLS (unencrypted MPEG-TS audio; encrypted and fMP4 report a clear error). See 009 §11.
+
 ## Playback pipeline
 ```text
 Source (file | downloaded episode | URL | LAN stream)

@@ -1,5 +1,7 @@
 # 007 — Media Library, Podcasts and Internet Radio
 
+> **Update 2026-11-08:** built: library scan with artists/albums/genres, details editor (metadata.txt per folder), playlists/favorites (JSON in Downloads/Cindrix/Playlists), offline downloads for episodes and videos, video sources (Internet Archive, PeerTube, YouTube/any site via the private-build-only yt-dlp helper). LAN sources are AirLink's job. Production builds must compile with --no-default-features (no yt-dlp).
+
 ## Content ownership and discovery
 Cindrix Radio supports user-owned local music and audio, removable drives, downloaded podcast episodes, audiobook collections, compatible LAN media sources, and online podcast/radio catalogs. Imported media defaults to **reference in place** rather than copied files. Optional managed copy is explicit and shows expected storage cost.
 

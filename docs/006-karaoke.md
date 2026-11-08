@@ -1,5 +1,7 @@
 # 006 — Karaoke and Lyrics Architecture
 
+> **Update 2026-11-08:** built: vocal reduction slider (stereo mid removal), pick/stage views, user-pasted local-only lyrics with editor, toggle default Off. Still needed: Android full-screen karaoke view.
+
 ## Approved experience
 Karaoke means playing a music track with **optional strong vocal reduction/attempted removal**, while displaying plain, manually scrollable lyrics. Timed text, word highlighting, lyric synchronization and live microphones are **not required**. The existing file is never modified or replaced.
 

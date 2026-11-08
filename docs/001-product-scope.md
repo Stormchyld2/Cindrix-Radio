@@ -1,5 +1,7 @@
 # 001 — Product Scope and Requirements
 
+> **Update 2026-11-08:** connection modes are now only **Online** and **Grid-Down** (no LAN Only). LAN streaming/Audio Sharing moved out of this app into the separate **AirLink** file-sharing app. Videos (with an in-app player), HLS radio, playlists/favorites, karaoke with vocal reduction, the details editor and audiobook handling are built; see 009 §11 for the decision log. Where the text below mentions LAN, read it as AirLink.
+
 ## Purpose
 Cindrix Radio is an audio library, podcast/radio client, and local-network audio sharing application for Windows and Android. The same library should remain usable in three modes: **Online**, **LAN Only**, and **Device Offline**.
 

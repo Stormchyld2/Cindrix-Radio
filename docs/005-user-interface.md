@@ -1,5 +1,7 @@
 # 005 — UI, Dashboard, Widgets and Theme
 
+> **Update 2026-11-08:** current tabs are Dashboard, Library, Radio, Podcasts, Videos, Karaoke, Playlists, Favorites, Settings. LAN Streaming and Audio Sharing tabs are removed (AirLink). Of the 17 settings subtabs, 5 are built; the rest are pending. Phone layout (hamburger drawer) is next with the Android work.
+
 ## Design system
 Follow Cindrix Overwatch family identity without reusing orange as the interactive accent. Primary app surfaces: charcoal / graphite (#111827 and #1E293B as initial candidates), metallic silver for branding/headers, **electric blue (#3B82F6 initial candidate)** for active navigation, focus, faders, rings, buttons and meters. Actual color values require design approval; role of blue is locked. Respect contrast, high DPI, dark mode and reduced motion.
 
