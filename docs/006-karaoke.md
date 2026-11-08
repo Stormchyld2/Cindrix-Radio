@@ -45,3 +45,5 @@ Karaoke toggle opens the mixer/lyrics experience without changing the ordinary l
 
 ## Android full-screen karaoke view (2026-11-08)
 Starting a karaoke song on Android opens a full-screen view showing only the lyrics area (user-supplied lyrics when the lyrics setting is on, otherwise the Cindrix Radio banner), the vocal remover/reducer controls, and the standard playback controls. When the song finishes or is stopped, the view returns to song selection. Collapsing the view keeps audio playing. Details in 009 section 11.
+
+Lyrics are added and linked to songs through a type-ahead song picker with a Browse button; see 011 for the flow and the Terms of Use requirement.
