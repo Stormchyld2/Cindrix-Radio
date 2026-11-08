@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Track } from "./api";
-  import { lists, listActions } from "./playlists.svelte";
+  import { lists, listActions } from "./playlistStore.svelte";
 
   let { track }: { track: Track } = $props();
   let open = $state(false);

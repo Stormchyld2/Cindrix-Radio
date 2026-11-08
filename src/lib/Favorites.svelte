@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { api, type Station } from "./api";
   import { actions } from "./player.svelte";
-  import { lists, listActions, playList, startTrack } from "./playlists.svelte";
+  import { lists, listActions, playList, startTrack } from "./playlistStore.svelte";
   import { store } from "./settings.svelte";
 
   let stations = $state<Station[]>([]);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Playlist, Track } from "./api";
-  import { lists, listActions, playList, startTrack } from "./playlists.svelte";
+  import { lists, listActions, playList, startTrack } from "./playlistStore.svelte";
 
   let openId = $state<string | null>(null);
   let creating = $state(false);

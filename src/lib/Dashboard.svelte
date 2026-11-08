@@ -4,7 +4,7 @@
   import { api, type Counts, type Folders, type LibItem, type SourceStatus, type Track } from "./api";
   import { player, actions } from "./player.svelte";
   import { store, settingsActions } from "./settings.svelte";
-  import { startTrack } from "./playlists.svelte";
+  import { startTrack } from "./playlistStore.svelte";
 
   let { go }: { go: (tab: string) => void } = $props();
 
