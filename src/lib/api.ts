@@ -8,6 +8,10 @@ export interface Folders { root: string; radio: string; music: string; podcasts:
 export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[] }
 export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings }
 
+export interface Episode { guid: string; title: string; enclosure_url: string; published: string | null; duration_secs: number | null; file: string | null; played: boolean }
+export interface Feed { id: string; url: string; title: string; image: string | null; episodes: Episode[] }
+export interface ImportResult { feeds: Feed[]; failed: string[] }
+
 const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 // Browser fallback so the UI can be developed with plain `npm run dev`.
@@ -17,7 +21,16 @@ const call = async <T>(cmd: string, args: Record<string, unknown> = {}, fb: () =
 
 let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0) } };
 
+const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
+
 export const api = {
+  podcastList: () => call<Feed[]>("podcast_list", {}, () => []),
+  podcastAdd: (url: string) => call<Feed[]>("podcast_add", { url }, desktopOnly),
+  podcastImportOpml: (xml: string) => call<ImportResult>("podcast_import_opml", { xml }, desktopOnly),
+  podcastRefresh: () => call<ImportResult>("podcast_refresh", {}, desktopOnly),
+  podcastRemove: (id: string) => call<Feed[]>("podcast_remove", { id }, desktopOnly),
+  podcastDownload: (feedId: string, guid: string) => call<Feed[]>("podcast_download", { feedId, guid }, desktopOnly),
+  podcastMarkPlayed: (feedId: string, guid: string, played: boolean) => call<Feed[]>("podcast_mark_played", { feedId, guid, played }, desktopOnly),
   settings: () => call<Settings>("get_settings", {}, () => mockSettings),
   setLyricsViewer: (on: boolean) => call<Settings>("set_lyrics_viewer", { on }, () => (mockSettings = { ...mockSettings, lyrics_viewer: on })),
   acceptTerms: (version: string) => call<Settings>("accept_terms", { version }, () => (mockSettings = { ...mockSettings, terms_version: version })),

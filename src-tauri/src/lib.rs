@@ -1,12 +1,15 @@
 mod dsp;
 mod engine;
 mod paths;
+mod podcasts;
 mod player;
 mod settings;
 
 use player::{Player, PlayerState, Track};
 use std::sync::Mutex;
 use engine::Engine;
+use podcasts::{Feed, PodStore};
+use serde::Serialize;
 use tauri::State;
 
 pub struct AppSettings {
@@ -108,6 +111,91 @@ fn set_eq(s: State<AppSettings>, e: State<Engine>, eq: dsp::EqSettings) -> setti
     s.update(|g| g.eq = eq.clamped())
 }
 
+#[derive(Serialize)]
+struct ImportResult { feeds: Vec<Feed>, failed: Vec<String> }
+
+type Blocking<T> = Result<T, String>;
+
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Blocking<T> + Send + 'static) -> Blocking<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn podcast_list(store: State<PodStore>) -> Vec<Feed> { store.feeds.lock().unwrap().clone() }
+
+#[tauri::command]
+async fn podcast_add(store: State<'_, PodStore>, url: String) -> Result<Vec<Feed>, String> {
+    let store = store.inner().clone();
+    blocking(move || Ok(store.upsert(podcasts::fetch_feed(&url)?))).await
+}
+
+#[tauri::command]
+async fn podcast_import_opml(store: State<'_, PodStore>, xml: String) -> Result<ImportResult, String> {
+    let store = store.inner().clone();
+    blocking(move || {
+        let urls = podcasts::parse_opml(&xml);
+        if urls.is_empty() { return Err("No podcast feeds found in that file".to_string()); }
+        let mut failed = Vec::new();
+        for u in urls {
+            match podcasts::fetch_feed(&u) { Ok(f) => { store.upsert(f); } Err(e) => failed.push(format!("{u}: {e}")) }
+        }
+        Ok(ImportResult { feeds: store.feeds.lock().unwrap().clone(), failed })
+    }).await
+}
+
+#[tauri::command]
+async fn podcast_refresh(store: State<'_, PodStore>) -> Result<ImportResult, String> {
+    let store = store.inner().clone();
+    blocking(move || {
+        let urls: Vec<String> = store.feeds.lock().unwrap().iter().map(|f| f.url.clone()).collect();
+        let mut failed = Vec::new();
+        for u in urls {
+            match podcasts::fetch_feed(&u) { Ok(f) => { store.upsert(f); } Err(e) => failed.push(format!("{u}: {e}")) }
+        }
+        Ok(ImportResult { feeds: store.feeds.lock().unwrap().clone(), failed })
+    }).await
+}
+
+#[tauri::command]
+fn podcast_remove(store: State<PodStore>, id: String) -> Vec<Feed> {
+    // removes the subscription only; downloaded files are never deleted
+    let mut g = store.feeds.lock().unwrap();
+    g.retain(|f| f.id != id);
+    store.save(&g);
+    g.clone()
+}
+
+#[tauri::command]
+async fn podcast_download(store: State<'_, PodStore>, feed_id: String, guid: String) -> Result<Vec<Feed>, String> {
+    let store = store.inner().clone();
+    blocking(move || {
+        let (feed, ep) = {
+            let g = store.feeds.lock().unwrap();
+            let feed = g.iter().find(|f| f.id == feed_id).ok_or("Podcast not found")?.clone();
+            let ep = feed.episodes.iter().find(|e| e.guid == guid).ok_or("Episode not found")?.clone();
+            (feed, ep)
+        };
+        let root = std::path::PathBuf::from(paths::default_folders().podcasts);
+        let saved = podcasts::download_episode(&root, &feed, &ep)?;
+        let mut g = store.feeds.lock().unwrap();
+        if let Some(e) = g.iter_mut().find(|f| f.id == feed_id).and_then(|f| f.episodes.iter_mut().find(|e| e.guid == guid)) {
+            e.file = Some(saved.to_string_lossy().into_owned());
+        }
+        store.save(&g);
+        Ok(g.clone())
+    }).await
+}
+
+#[tauri::command]
+fn podcast_mark_played(store: State<PodStore>, feed_id: String, guid: String, played: bool) -> Vec<Feed> {
+    let mut g = store.feeds.lock().unwrap();
+    if let Some(e) = g.iter_mut().find(|f| f.id == feed_id).and_then(|f| f.episodes.iter_mut().find(|e| e.guid == guid)) {
+        e.played = played;
+    }
+    store.save(&g);
+    g.clone()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -119,13 +207,16 @@ pub fn run() {
             let path = dir.join("settings.json");
             let loaded = settings::Settings::load(&path);
             app.manage(Engine::start(loaded.eq.clone(), 0.8));
+            app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_folders, player_state, player_play, player_toggle,
             player_next, player_enqueue, player_volume,
-            get_settings, set_lyrics_viewer, accept_terms, set_eq
+            get_settings, set_lyrics_viewer, accept_terms, set_eq,
+            podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
+            podcast_download, podcast_mark_played
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");
