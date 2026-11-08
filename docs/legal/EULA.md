@@ -1,6 +1,6 @@
 # Cindrix Radio — End User License Agreement
 
-Effective: [EFFECTIVE DATE] · Version 1.0 · Licensor: [OWNER] ("we", "us")
+Effective: November 8, 2026 · Version 1.0 · Licensor: Cindrix Development (owner: Jason Williams) ("we", "us")
 
 By installing, accepting these terms on first run, or using Cindrix Radio (the "Software"), you agree to this Agreement. If you do not agree, do not install or use the Software.
 
@@ -41,7 +41,7 @@ THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY K
 TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR LOST DATA, PROFITS OR GOODWILL, ARISING FROM OR RELATED TO THE SOFTWARE OR YOUR CONTENT, EVEN IF ADVISED OF THE POSSIBILITY. OUR TOTAL LIABILITY FOR ALL CLAIMS WILL NOT EXCEED THE GREATER OF THE AMOUNT YOU PAID FOR THE SOFTWARE IN THE PRECEDING 12 MONTHS OR US$50.
 
 ## 13. Indemnification
-You agree to defend, indemnify and hold harmless [OWNER] and its contributors from claims, damages, losses and expenses (including reasonable attorneys' fees) arising from your content, your use of the Software, or your breach of this Agreement or any law or third-party right.
+You agree to defend, indemnify and hold harmless Cindrix Development, its owner Jason Williams, and its contributors from claims, damages, losses and expenses (including reasonable attorneys' fees) arising from your content, your use of the Software, or your breach of this Agreement or any law or third-party right.
 
 ## 14. General
-Governed by the laws of [STATE], USA, without regard to conflict-of-law rules. Disputes will be brought in the state or federal courts located in [STATE], except that either party may bring an individual claim in small-claims court. Before filing, you agree to try to resolve the dispute informally by emailing [CONTACT EMAIL] and waiting 30 days. If any provision is unenforceable, the rest remain in effect. This Agreement, with the Terms of Service and Privacy Policy, is the entire agreement about the Software. You may not assign it without our consent; we may assign it. Failure to enforce a provision is not a waiver. You may not export the Software in violation of applicable export laws.
+Governed by the laws of the U.S. state in which Cindrix Development is organized or has its principal place of business, without regard to conflict-of-law rules. Disputes will be brought in the state or federal courts located in that state, except that either party may bring an individual claim in small-claims court. Before filing, you agree to try to resolve the dispute informally by emailing cindrixops@proton.me and waiting 30 days. If any provision is unenforceable, the rest remain in effect. This Agreement, with the Terms of Service and Privacy Policy, is the entire agreement about the Software. You may not assign it without our consent; we may assign it. Failure to enforce a provision is not a waiver. You may not export the Software in violation of applicable export laws.

@@ -1,6 +1,6 @@
 # Cindrix Radio — Privacy Policy
 
-Effective: [EFFECTIVE DATE] · Version 1.0 · Controller: [OWNER] · Contact: [CONTACT EMAIL]
+Effective: November 8, 2026 · Version 1.0 · Controller: Cindrix Development (owner: Jason Williams) · Contact: cindrixops@proton.me
 
 ## Summary
 No account. No analytics, advertising or tracking. We run no server that receives your library, lyrics or listening history. Your data stays on your device.
@@ -26,7 +26,7 @@ Storage or drive access to read folders you choose and save to Downloads/Cindrix
 Not directed to children under 13, and we do not knowingly collect data from them. Because the app collects no personal data, there is nothing for us to delete or share; if you believe otherwise, contact us.
 
 ## Your rights
-Because we do not hold your data, access, correction and deletion are handled on your device through the app. Depending on where you live (for example under GDPR or CCPA), you may have additional rights; email [CONTACT EMAIL] and we will respond.
+Because we do not hold your data, access, correction and deletion are handled on your device through the app. Depending on where you live (for example under GDPR or CCPA), you may have additional rights; email cindrixops@proton.me and we will respond.
 
 ## Security
 Data is stored in your device's app storage. Use your device's own protections such as screen lock and encryption. No method is perfectly secure.
