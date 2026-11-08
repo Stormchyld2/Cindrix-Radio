@@ -15,6 +15,13 @@ svc = '    <service android:name=".PlaybackService" android:exported="false" and
 s = s.replace("</application>", svc + "    </application>", 1)
 man.write_text(s)
 pkg = next(gen.glob("java/**/MainActivity.kt")).parent
-for f in ("MainActivity.kt", "PlaybackService.kt"):
+for f in ("MainActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt"):
     shutil.copy(pathlib.Path("android") / f, pkg / f)
-print(man.read_text())
+
+# Gradle: bundle the open-source yt-dlp library, and let it unpack its native files
+g = next(pathlib.Path("src-tauri/gen/android/app").glob("build.gradle.kts"))
+t = g.read_text()
+t = re.sub(r"^android \{", "android {\n    packaging { jniLibs { useLegacyPackaging = true } }", t, count=1, flags=re.M)
+t += '\ndependencies {\n    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")\n}\n'
+g.write_text(t)
+print(man.read_text()); print(t)

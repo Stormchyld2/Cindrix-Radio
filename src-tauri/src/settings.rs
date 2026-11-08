@@ -13,11 +13,13 @@ pub struct Settings {
     pub eq: EqSettings,
     /// Grid-Down mode: no network use at all, only local and downloaded content. Default: Online.
     pub grid_down: bool,
+    /// Pause when headphones or a Bluetooth speaker disconnect (Android). Default on.
+    pub pause_on_disconnect: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { lyrics_viewer: false, terms_version: None, eq: EqSettings::default(), grid_down: false }
+        Settings { lyrics_viewer: false, terms_version: None, eq: EqSettings::default(), grid_down: false, pause_on_disconnect: true }
     }
 }
 

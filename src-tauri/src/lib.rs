@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+mod android;
 mod dsp;
 mod engine;
 mod history;
@@ -107,8 +109,40 @@ fn player_state(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib:
         s.next();
         begin(&e, &h, &lib, &mut s);
     }
+    #[cfg(target_os = "android")]
+    android::media_sync(&s);
     s.clone()
 }
+
+/// A command from the lock screen, a Bluetooth/headset button, the notification, or audio focus.
+#[cfg(target_os = "android")]
+pub(crate) fn media_command(app: &tauri::AppHandle, cmd: &str) {
+    use tauri::Manager;
+    let playing = app.state::<Player>().0.lock().unwrap().playing;
+    match cmd {
+        "play" if !playing => { player_toggle(app.state(), app.state(), app.state(), app.state()); }
+        "pause" if playing => { player_toggle(app.state(), app.state(), app.state(), app.state()); }
+        "toggle" => { player_toggle(app.state(), app.state(), app.state(), app.state()); }
+        "next" => { player_next(app.state(), app.state(), app.state(), app.state()); }
+        "prev" => { player_seek(app.state(), app.state(), 0); }
+        "noisy" if playing && app.state::<AppSettings>().inner.lock().unwrap().pause_on_disconnect => {
+            player_toggle(app.state(), app.state(), app.state(), app.state());
+        }
+        _ => {}
+    }
+}
+
+/// Open the phone's Bluetooth settings (Android only).
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn open_bluetooth_settings() -> Result<(), String> { android::open_bluetooth_settings() }
+
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+fn open_bluetooth_settings() -> Result<(), String> {
+    Err("Bluetooth devices are managed in your system settings on this platform.".into())
+}
+
 
 #[tauri::command]
 fn player_play(settings: State<AppSettings>, p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>, track: Track) -> PlayerState {
@@ -512,6 +546,8 @@ pub fn run() {
             app.manage(PlaylistStore::load(std::path::PathBuf::from(&folders.root).join("Playlists").join("playlists.json")));
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
+            #[cfg(target_os = "android")]
+            android::set_app(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -524,7 +560,7 @@ pub fn run() {
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
             playlists_get, playlist_create, playlist_rename, playlist_delete, playlist_add, playlist_remove, playlist_shift, favorite_toggle,
-            video_sources, video_search, video_download, ytdl_status, ytdl_install
+            video_sources, video_search, video_download, ytdl_status, ytdl_install, open_bluetooth_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");

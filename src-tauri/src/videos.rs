@@ -291,6 +291,7 @@ pub mod ytdl {
 
     fn exe_name() -> &'static str { if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" } }
 
+    #[cfg(not(target_os = "android"))]
     fn run(bin: &Path, args: &[&str]) -> Result<String, String> {
         let mut c = Command::new(bin);
         c.args(args);
@@ -305,6 +306,7 @@ pub mod ytdl {
     }
 
     /// The yt-dlp we manage in the app data folder, else one on the PATH.
+    #[cfg(not(target_os = "android"))]
     pub fn binary(data_dir: &Path) -> Option<PathBuf> {
         unpack_embedded(data_dir);
         let own = data_dir.join("bin").join(exe_name());
@@ -313,12 +315,21 @@ pub mod ytdl {
         run(&on_path, &["--version"]).ok().map(|_| on_path)
     }
 
+    #[cfg(not(target_os = "android"))]
     pub fn version(data_dir: &Path) -> Option<String> {
         let b = binary(data_dir)?;
         run(&b, &["--version"]).ok().map(|v| v.trim().to_string())
     }
 
+    /// On the phone the helper is the open-source yt-dlp Android library, bundled in the app.
+    #[cfg(target_os = "android")]
+    pub fn version(_: &Path) -> Option<String> { crate::android::yt_version().ok().filter(|v| !v.is_empty()) }
+
+    #[cfg(target_os = "android")]
+    pub fn install(_: &Path) -> Result<String, String> { crate::android::yt_update() }
+
     /// Download (or update to) the latest yt-dlp release into the app data folder.
+    #[cfg(not(target_os = "android"))]
     pub fn install(data_dir: &Path) -> Result<String, String> {
         let asset = if cfg!(windows) { "yt-dlp.exe" } else if cfg!(target_os = "macos") { "yt-dlp_macos" } else { "yt-dlp_linux" };
         let dir = data_dir.join("bin");
@@ -386,16 +397,41 @@ pub mod ytdl {
 
     /// A search phrase, or a pasted video link.
     pub fn search(data_dir: &Path, q: &str, limit: u32, offset: u32) -> Result<Vec<VideoHit>, String> {
+        let out = run_search(data_dir, q, limit, offset)?;
+        let v: Value = serde_json::from_str(&out).map_err(|e| format!("Unexpected answer from yt-dlp: {e}"))?;
+        Ok(parse_search(&v).into_iter().skip(offset as usize).collect())
+    }
+
+    #[cfg(target_os = "android")]
+    fn run_search(_: &Path, q: &str, limit: u32, offset: u32) -> Result<String, String> {
+        let single = q.starts_with("http://") || q.starts_with("https://");
+        let target = if single { q.to_string() } else { format!("ytsearch{}:{}", limit + offset, q) };
+        crate::android::yt_search(&target, single)
+    }
+
+    #[cfg(not(target_os = "android"))]
+    fn run_search(data_dir: &Path, q: &str, limit: u32, offset: u32) -> Result<String, String> {
         let bin = binary(data_dir).ok_or("The YouTube helper (yt-dlp) is not installed yet. Install it from the Videos tab.")?;
-        let out = if q.starts_with("http://") || q.starts_with("https://") {
-            run(&bin, &["--dump-single-json", "--flat-playlist", "--no-playlist", "--no-warnings", "--", q])?
+        if q.starts_with("http://") || q.starts_with("https://") {
+            run(&bin, &["--dump-single-json", "--flat-playlist", "--no-playlist", "--no-warnings", "--", q])
         } else {
             let n = (limit + offset).to_string();
             let term = format!("ytsearch{n}:{q}");
-            run(&bin, &["--dump-single-json", "--flat-playlist", "--no-warnings", "--", &term])?
-        };
-        let v: Value = serde_json::from_str(&out).map_err(|e| format!("Unexpected answer from yt-dlp: {e}"))?;
-        Ok(parse_search(&v).into_iter().skip(offset as usize).collect())
+            run(&bin, &["--dump-single-json", "--flat-playlist", "--no-warnings", "--", &term])
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    fn run_download(_: &Path, url: &str, dir: &Path) -> Result<String, String> { crate::android::yt_download(url, &dir.to_string_lossy()) }
+
+    #[cfg(not(target_os = "android"))]
+    fn run_download(data_dir: &Path, url: &str, dir: &Path) -> Result<String, String> {
+        let bin = binary(data_dir).ok_or("The YouTube helper (yt-dlp) is not installed yet. Install it from the Videos tab.")?;
+        run(&bin, &[
+            "-f", "b[ext=mp4]/b", "--no-playlist", "--no-warnings", "--windows-filenames", "--no-mtime", "-q",
+            "--no-simulate", "--print", "after_move:filepath",
+            "-P", &dir.to_string_lossy(), "-o", "%(title).150B.%(ext)s", "--", url,
+        ])
     }
 
     pub fn download(data_dir: &Path, hit: &VideoHit, dir: &Path) -> Result<PathBuf, String> {
@@ -403,13 +439,8 @@ pub mod ytdl {
             if !safe_id(&hit.id) { return Err("Bad video id".into()); }
             format!("https://www.youtube.com/watch?v={}", hit.id)
         } else if is_http(&hit.page_url) { hit.page_url.clone() } else { return Err("Bad video address".into()); };
-        let bin = binary(data_dir).ok_or("The YouTube helper (yt-dlp) is not installed yet. Install it from the Videos tab.")?;
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let out = run(&bin, &[
-            "-f", "b[ext=mp4]/b", "--no-playlist", "--no-warnings", "--windows-filenames", "--no-mtime", "-q",
-            "--no-simulate", "--print", "after_move:filepath",
-            "-P", &dir.to_string_lossy(), "-o", "%(title).150B.%(ext)s", "--", &url,
-        ])?;
+        let out = run_download(data_dir, &url, dir)?;
         let path = PathBuf::from(out.lines().rev().find(|l| !l.trim().is_empty()).ok_or("yt-dlp did not report a file")?.trim());
         if !path.exists() { return Err("yt-dlp finished but the file was not found".into()); }
         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {

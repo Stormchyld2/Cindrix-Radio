@@ -12,11 +12,10 @@ fn main() {
         std::fs::write(&out, []).unwrap();
     }
     println!("cargo:rerun-if-changed=ytdlp/yt-dlp.exe");
-    // `ytdl_on`: the yt-dlp helper is compiled in (feature on, and not an Android build, where
-    // the open-source Android library will be used instead).
+    // `ytdl_on`: the yt-dlp helper is compiled in (private build). On Android it is the bundled
+    // open-source yt-dlp library, reached through crate::android.
     println!("cargo:rustc-check-cfg=cfg(ytdl_on)");
-    let android = std::env::var("CARGO_CFG_TARGET_OS").map(|o| o == "android").unwrap_or(false);
-    if std::env::var("CARGO_FEATURE_YTDL").is_ok() && !android {
+    if std::env::var("CARGO_FEATURE_YTDL").is_ok() {
         println!("cargo:rustc-cfg=ytdl_on");
     }
     tauri_build::build()
