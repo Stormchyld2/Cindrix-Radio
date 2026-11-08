@@ -16,7 +16,10 @@ The Software plays and organizes content that **you** provide or choose: local f
 ## 4. No encouragement of infringement
 The Software does not condone, facilitate or encourage copyright infringement or any other violation of law. It ships with no music, lyrics, video or other licensed content and performs no online lyrics lookup. Features such as vocal reduction, stream recording, video playback and local network sharing are provided for lawful personal use of content you are entitled to use.
 
-## 5. User-added lyrics
+## 5. Offline downloads
+Download and offline features are for personal offline listening or viewing of content you are entitled to access, like offline mode in a streaming service. The Software does not circumvent copy protection, DRM, logins or access controls, and you must not use it to do so. Do not redistribute what you download.
+
+## 5A. User-added lyrics
 The lyrics viewer is off by default. If you turn it on, lyrics you add are stored only on your device. We do not receive, host, copy or sync them, and the Software does not share them over your local network. You are solely responsible for the text you add.
 
 ## 6. Third-party services and content

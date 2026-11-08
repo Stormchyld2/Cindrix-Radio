@@ -16,6 +16,9 @@ You are solely responsible for everything you import, add, paste, download, reco
 ## 4. No condoning of infringement
 Cindrix Radio does not condone, facilitate or encourage copyright infringement. Features exist for lawful personal use only. Public performance (for example karaoke at a business or paid event) and commercial use may require licenses that are your responsibility.
 
+## 4A. Offline downloads
+Download features are for personal offline use of content you are entitled to access. They do not bypass DRM, copy protection or access controls, and you may not use them to do so or to redistribute content.
+
 ## 5. Recording
 Recording streams is allowed only where the law and the stream's owner permit it, for personal use. You are responsible for compliance. Do not redistribute or rebroadcast recordings.
 
