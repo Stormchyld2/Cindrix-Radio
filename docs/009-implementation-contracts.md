@@ -151,3 +151,8 @@ Refer to [005 — UI, Dashboard, Widgets and Theme](005-user-interface.md) for t
 - **Navigation continuity:** return to the prior section's scroll offset, filters and selection where valid; Android and Windows share user-facing functionality but adapt navigation per platform.
 
 UI testing must include narrow Windows window, desktop wheel and keyboard, Android portrait gestures, screen-reader navigation, drawer accessibility, and hidden-but-functional scroll. These design approvals do not imply implementation is complete.
+
+
+## 11. Settings delivery gates (2026-11-07)
+
+Implement the complete Settings specification in [010 — Settings Architecture](010-settings-architecture.md). **Settings remains a single top-level tab with 16 subtabs.** General opens by default; Windows uses secondary Settings navigation and Android uses a compact in-Settings subtab selector entered via the main hamburger drawer. Four category headings organize rather than add hierarchy. Include searchable controls, proper persistence and safe recovery, supported platform-only options, category-specific resets, and backup/restore with no secret export. Validate that no Settings action silently deletes user originals, enables LAN sharing, or creates persistent karaoke stems. Test hidden-but-functional scrolling, dangerous-action confirmations, single playback-coordinator updates, and Windows/Android setting parity. Defaults in 010 that are not marked LOCKED are suggested v1 choices and may be refined during platform testing; conditional or optional features must never be displayed as available before implementation.
