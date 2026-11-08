@@ -1,10 +1,12 @@
 mod dsp;
+mod engine;
 mod paths;
 mod player;
 mod settings;
 
 use player::{Player, PlayerState, Track};
 use std::sync::Mutex;
+use engine::Engine;
 use tauri::State;
 
 pub struct AppSettings {
@@ -28,22 +30,50 @@ fn get_folders() -> Result<paths::Folders, String> {
     Ok(f)
 }
 
-#[tauri::command]
-fn player_state(p: State<Player>) -> PlayerState { p.0.lock().unwrap().clone() }
-
-#[tauri::command]
-fn player_play(p: State<Player>, track: Track) -> PlayerState {
-    let mut s = p.0.lock().unwrap(); s.play(track); s.clone()
+/// Start whatever the player state says is current. Streams arrive with Radio.
+fn start_current(engine: &Engine, s: &PlayerState) {
+    match s.current.as_ref().and_then(|t| t.path.as_deref()) {
+        Some(path) => engine.play_file(path),
+        None => engine.stop(),
+    }
 }
 
 #[tauri::command]
-fn player_toggle(p: State<Player>) -> PlayerState {
-    let mut s = p.0.lock().unwrap(); s.toggle(); s.clone()
+fn player_state(p: State<Player>, e: State<Engine>) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    let st = e.status();
+    if s.playing && s.current.is_some() { s.position_secs = st.position_secs; }
+    s.error = st.error;
+    // song finished on its own: move on to the next queued track
+    if e.take_ended() && s.playing {
+        s.next();
+        start_current(&e, &s);
+    }
+    s.clone()
 }
 
 #[tauri::command]
-fn player_next(p: State<Player>) -> PlayerState {
-    let mut s = p.0.lock().unwrap(); s.next(); s.clone()
+fn player_play(p: State<Player>, e: State<Engine>, track: Track) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    s.play(track);
+    start_current(&e, &s);
+    s.clone()
+}
+
+#[tauri::command]
+fn player_toggle(p: State<Player>, e: State<Engine>) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    s.toggle();
+    if s.current.is_some() { if s.playing { e.resume() } else { e.pause() } }
+    s.clone()
+}
+
+#[tauri::command]
+fn player_next(p: State<Player>, e: State<Engine>) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    s.next();
+    start_current(&e, &s);
+    s.clone()
 }
 
 #[tauri::command]
@@ -52,8 +82,11 @@ fn player_enqueue(p: State<Player>, track: Track) -> PlayerState {
 }
 
 #[tauri::command]
-fn player_volume(p: State<Player>, volume: f32) -> PlayerState {
-    let mut s = p.0.lock().unwrap(); s.set_volume(volume); s.clone()
+fn player_volume(p: State<Player>, e: State<Engine>, volume: f32) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    s.set_volume(volume);
+    e.set_volume(s.volume);
+    s.clone()
 }
 
 #[tauri::command]
@@ -70,19 +103,22 @@ fn accept_terms(s: State<AppSettings>, version: String) -> settings::Settings {
 }
 
 #[tauri::command]
-fn set_eq(s: State<AppSettings>, eq: dsp::EqSettings) -> settings::Settings {
+fn set_eq(s: State<AppSettings>, e: State<Engine>, eq: dsp::EqSettings) -> settings::Settings {
+    e.set_eq(eq.clone());
     s.update(|g| g.eq = eq.clamped())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(Player::new())
         .setup(|app| {
             use tauri::Manager;
             let dir = app.path().app_data_dir().expect("app data dir");
             let path = dir.join("settings.json");
             let loaded = settings::Settings::load(&path);
+            app.manage(Engine::start(loaded.eq.clone(), 0.8));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             Ok(())
         })

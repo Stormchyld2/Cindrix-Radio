@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Folders } from "./lib/api";
+  import { api, type Folders, type Track } from "./lib/api";
+  import { open } from "@tauri-apps/plugin-dialog";
   import { player, actions } from "./lib/player.svelte";
   import { sampleTracks, sampleDrives } from "./lib/sample";
   import SettingsView from "./lib/SettingsView.svelte";
@@ -16,6 +17,16 @@
 
   const nav = ["Dashboard", "Library", "Radio", "Playlists", "Favorites", "Settings"];
   let active = $state("Dashboard");
+  const inTauri = "__TAURI_INTERNALS__" in window;
+  async function playFile() {
+    const picked = await open({ multiple: false, filters: [{ name: "Audio", extensions: ["mp3", "flac", "ogg", "wav", "m4a", "aac", "opus"] }] });
+    if (typeof picked !== "string") return;
+    const name = picked.split(/[\\/]/).pop() ?? picked;
+    const t: Track = { id: picked, title: name.replace(/\.[^.]+$/, ""), subtitle: "Local file", kind: "Music", duration_secs: null, path: picked };
+    await actions.play(t);
+  }
+  // keep the position and queue in step with the audio engine
+  onMount(() => { const id = setInterval(actions.init, 500); return () => clearInterval(id); });
   const fmt = (s: number | null) => (s == null ? "LIVE" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 </script>
 
@@ -39,7 +50,8 @@
     <div class="cols">
       <section class="left">
         <div class="card">
-          <h3>Quick play</h3>
+          <div class="head"><h3>Quick play</h3>{#if inTauri}<button class="btn primary" onclick={playFile}>Play a file…</button>{/if}</div>
+          {#if player.s.error}<p class="err">{player.s.error}</p>{/if}
           <div class="rows">
             {#each sampleTracks as t}
               <div class="row">
@@ -119,6 +131,8 @@
   .meta{display:flex;flex-direction:column;font-size:13px}.meta span,.time,.muted{color:var(--muted);font-size:12px}
   .time{margin-left:auto}
   .note{font-size:13px;color:var(--muted)}
+  .head{display:flex;justify-content:space-between;align-items:center}
+  .err{color:var(--red);font-size:12px;margin:8px 0 0}
   footer{grid-column:1/3;display:flex;align-items:center;gap:20px;padding:0 20px;border-top:1px solid var(--line);background:var(--panel)}
   .np{display:flex;flex-direction:column;font-size:13px;min-width:200px}.np span{color:var(--muted)}
   .tx{display:flex;gap:8px}.vol{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}

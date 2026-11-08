@@ -70,7 +70,14 @@ impl Equalizer {
 
     pub fn set(&mut self, settings: EqSettings) {
         let s = settings.clamped();
-        let chain: [Biquad; 10] = std::array::from_fn(|i| Biquad::peaking(self.sample_rate, BANDS_HZ[i], s.gains_db[i], 1.414));
+        let mut chain: [Biquad; 10] = std::array::from_fn(|i| Biquad::peaking(self.sample_rate, BANDS_HZ[i], s.gains_db[i], 1.414));
+        if self.filters.len() == self.channels {
+            // keep filter memory so dragging a slider does not click
+            for (ch, old) in self.filters.iter().enumerate() {
+                for i in 0..10 { chain[i].z1 = old[i].z1; chain[i].z2 = old[i].z2; }
+                let _ = ch;
+            }
+        }
         self.filters = vec![chain; self.channels];
         self.preamp = 10f32.powf(s.preamp_db / 20.0);
         self.settings = s;

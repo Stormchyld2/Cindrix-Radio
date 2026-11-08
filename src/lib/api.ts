@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type Kind = "Music" | "Radio" | "Podcast" | "Audiobook" | "Video";
-export interface Track { id: string; title: string; subtitle: string; kind: Kind; duration_secs: number | null }
-export interface PlayerState { current: Track | null; queue: Track[]; playing: boolean; position_secs: number; volume: number }
+export interface Track { id: string; title: string; subtitle: string; kind: Kind; duration_secs: number | null; path?: string | null }
+export interface PlayerState { current: Track | null; queue: Track[]; playing: boolean; position_secs: number; volume: number; error?: string | null }
 export interface Folders { root: string; radio: string; music: string; podcasts: string; videos: string; recordings: string }
 
 export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[] }

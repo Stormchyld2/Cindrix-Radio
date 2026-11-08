@@ -14,6 +14,9 @@ pub struct Track {
     pub subtitle: String,
     pub kind: Kind,
     pub duration_secs: Option<u32>,
+    /// Local file to play. None for streams (added with Radio).
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -23,6 +26,7 @@ pub struct PlayerState {
     pub playing: bool,
     pub position_secs: u32,
     pub volume: f32,
+    pub error: Option<String>,
 }
 
 pub struct Player(pub Mutex<PlayerState>);
@@ -55,7 +59,7 @@ impl PlayerState {
 mod tests {
     use super::*;
     fn t(id: &str) -> Track {
-        Track { id: id.into(), title: id.into(), subtitle: String::new(), kind: Kind::Music, duration_secs: None }
+        Track { id: id.into(), title: id.into(), subtitle: String::new(), kind: Kind::Music, duration_secs: None, path: None }
     }
     #[test]
     fn next_advances_queue() {
