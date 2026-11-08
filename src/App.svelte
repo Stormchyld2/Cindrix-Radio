@@ -3,9 +3,13 @@
   import { api, type Folders } from "./lib/api";
   import { player, actions } from "./lib/player.svelte";
   import { sampleTracks, sampleDrives } from "./lib/sample";
+  import SettingsView from "./lib/SettingsView.svelte";
+  import TermsGate from "./lib/TermsGate.svelte";
+  import { store, settingsActions, TERMS_VERSION } from "./lib/settings.svelte";
 
   let folders = $state<Folders | null>(null);
   onMount(async () => {
+    await settingsActions.load();
     await actions.init();
     folders = await api.folders();
   });
@@ -14,6 +18,10 @@
   let active = $state("Dashboard");
   const fmt = (s: number | null) => (s == null ? "LIVE" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 </script>
+
+{#if store.s && store.s.terms_version !== TERMS_VERSION}
+  <TermsGate />
+{/if}
 
 <div class="shell">
   <header><img src="/logo.png" alt="Cindrix Radio" height="36" /></header>
@@ -25,6 +33,9 @@
 
   <main>
     <h1>{active}</h1>
+    {#if active === "Settings"}
+      <SettingsView />
+    {:else}
     <div class="cols">
       <section class="left">
         <div class="card">
@@ -67,6 +78,7 @@
         </div>
       </aside>
     </div>
+    {/if}
   </main>
 
   <footer>
