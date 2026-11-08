@@ -2,6 +2,7 @@ mod dsp;
 mod engine;
 mod history;
 mod library;
+mod lyrics;
 mod meta;
 mod paths;
 mod podcasts;
@@ -23,6 +24,7 @@ use podcasts::{Feed, PodStore};
 use serde::Serialize;
 use tauri::State;
 use videos::{VideoHit, VideoSource};
+use lyrics::{LyricsStore, Summary as LyricsSummary};
 use playlists::{Data as PlaylistData, PlaylistStore};
 
 pub struct AppSettings {
@@ -174,6 +176,37 @@ fn accept_terms(s: State<AppSettings>, version: String) -> settings::Settings {
 fn set_eq(s: State<AppSettings>, e: State<Engine>, eq: dsp::EqSettings) -> settings::Settings {
     e.set_eq(eq.clone());
     s.update(|g| g.eq = eq.clamped())
+}
+
+#[tauri::command]
+fn set_vocal_reduction(s: State<AppSettings>, e: State<Engine>, amount: f32) -> settings::Settings {
+    let out = s.update(|g| { g.eq.vocal_reduction = amount; g.eq = g.eq.clone().clamped(); });
+    e.set_eq(out.eq.clone());
+    out
+}
+
+fn lyrics_on(s: &AppSettings) -> Result<(), String> {
+    if s.inner.lock().unwrap().lyrics_viewer { Ok(()) } else { Err("Turn on the lyrics viewer in Settings first.".into()) }
+}
+
+/// Lyrics are only handed out while the lyrics viewer is on.
+#[tauri::command]
+fn lyrics_get(s: State<AppSettings>, l: State<LyricsStore>, path: String) -> Option<String> {
+    if lyrics_on(&s).is_err() { return None; }
+    l.get(&path)
+}
+
+#[tauri::command]
+fn lyrics_set(s: State<AppSettings>, l: State<LyricsStore>, path: String, title: String, text: String) -> Result<Vec<LyricsSummary>, String> {
+    lyrics_on(&s)?;
+    l.set(&path, &title, &text)?;
+    Ok(l.list())
+}
+
+#[tauri::command]
+fn lyrics_list(s: State<AppSettings>, l: State<LyricsStore>) -> Vec<LyricsSummary> {
+    if lyrics_on(&s).is_err() { return vec![]; }
+    l.list()
 }
 
 #[derive(Serialize)]
@@ -445,6 +478,7 @@ pub fn run() {
             let _ = paths::ensure(&folders);
             lib.ensure_builtin(&folders.root);
             app.manage(lib);
+            app.manage(LyricsStore::load(dir.join("lyrics.json")));
             app.manage(PlaylistStore::load(std::path::PathBuf::from(&folders.root).join("Playlists").join("playlists.json")));
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
@@ -453,7 +487,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_folders, player_state, player_play, player_toggle,
             player_next, player_enqueue, player_volume,
-            get_settings, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
+            get_settings, set_vocal_reduction, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,

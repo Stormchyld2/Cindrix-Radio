@@ -10,5 +10,6 @@ export const settingsActions = {
   setLyrics: async (on: boolean) => { store.s = await api.setLyricsViewer(on); },
   setGridDown: async (on: boolean) => { store.s = await api.setGridDown(on); },
   accept: async () => { store.s = await api.acceptTerms(TERMS_VERSION); },
+  setVocal: async (amount: number) => { store.s = await api.setVocalReduction(amount); },
   setEq: async (eq: EqSettings) => { store.s = await api.setEq(eq); },
 };

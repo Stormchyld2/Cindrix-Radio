@@ -5,7 +5,7 @@ export interface Track { id: string; title: string; subtitle: string; kind: Kind
 export interface PlayerState { current: Track | null; queue: Track[]; playing: boolean; position_secs: number; volume: number; error?: string | null; now_playing?: string | null; recording?: boolean; connecting?: boolean }
 export interface Folders { root: string; radio: string; music: string; podcasts: string; audiobooks: string; videos: string; recordings: string }
 
-export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[] }
+export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[]; vocal_reduction: number }
 export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings; grid_down: boolean }
 
 export interface Episode { guid: string; title: string; enclosure_url: string; published: string | null; duration_secs: number | null; file: string | null; played: boolean }
@@ -20,6 +20,7 @@ export interface Page { items: LibItem[]; total: number }
 export interface AlbumRow { album: string; artist: string; count: number }
 export interface Counts { music: number; podcast: number; audiobook: number; video: number }
 
+export interface LyricsSummary { path: string; title: string; chars: number }
 export interface Playlist { id: string; name: string; items: Track[] }
 export interface PlaylistData { playlists: Playlist[]; favorites: Track[] }
 export interface VideoHit { id: string; source: string; title: string; channel: string; duration_secs: number | null; thumbnail: string | null; page_url: string; embed_url: string | null }
@@ -36,7 +37,7 @@ let mock: PlayerState = { current: null, queue: [], playing: false, position_sec
 const call = async <T>(cmd: string, args: Record<string, unknown> = {}, fb: () => T): Promise<T> =>
   inTauri ? invoke<T>(cmd, args) : fb();
 
-let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_down: false, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0) } };
+let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_down: false, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0), vocal_reduction: 0 } };
 
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
@@ -58,6 +59,10 @@ export const api = {
   playlistRemove: (id: string, index: number) => call<PlaylistData>("playlist_remove", { id, index }, desktopOnly),
   playlistShift: (id: string, index: number, delta: number) => call<PlaylistData>("playlist_shift", { id, index, delta }, desktopOnly),
   favoriteToggle: (track: Track) => call<PlaylistData>("favorite_toggle", { track }, desktopOnly),
+  setVocalReduction: (amount: number) => call<Settings>("set_vocal_reduction", { amount }, () => (mockSettings = { ...mockSettings, eq: { ...mockSettings.eq, vocal_reduction: amount } })),
+  lyricsGet: (path: string) => call<string | null>("lyrics_get", { path }, () => null),
+  lyricsSet: (path: string, title: string, text: string) => call<LyricsSummary[]>("lyrics_set", { path, title, text }, desktopOnly),
+  lyricsList: () => call<LyricsSummary[]>("lyrics_list", {}, () => []),
   videoSources: () => call<VideoSource[]>("video_sources", {}, () => []),
   videoSearch: (source: string, query: string, limit: number, offset: number) => call<VideoHit[]>("video_search", { source, query, limit, offset }, () => []),
   videoDownload: (hit: VideoHit) => call<string>("video_download", { hit }, desktopOnly),

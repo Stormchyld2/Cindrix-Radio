@@ -11,16 +11,20 @@ pub struct EqSettings {
     pub bypass: bool,
     pub preamp_db: f32,
     pub gains_db: [f32; 10],
+    /// Karaoke vocal reduction, 0.0 (off) to 1.0 (full). Applied before the EQ, stereo only.
+    #[serde(default)]
+    pub vocal_reduction: f32,
 }
 
 impl Default for EqSettings {
-    fn default() -> Self { EqSettings { bypass: false, preamp_db: 0.0, gains_db: [0.0; 10] } }
+    fn default() -> Self { EqSettings { bypass: false, preamp_db: 0.0, gains_db: [0.0; 10], vocal_reduction: 0.0 } }
 }
 
 impl EqSettings {
     pub fn clamped(mut self) -> Self {
         self.preamp_db = self.preamp_db.clamp(-MAX_DB, MAX_DB);
         for g in self.gains_db.iter_mut() { *g = g.clamp(-MAX_DB, MAX_DB); }
+        self.vocal_reduction = if self.vocal_reduction.is_finite() { self.vocal_reduction.clamp(0.0, 1.0) } else { 0.0 };
         self
     }
 }
@@ -59,11 +63,14 @@ pub struct Equalizer {
     settings: EqSettings,
     filters: Vec<[Biquad; 10]>, // one chain per channel
     preamp: f32,
+    /// vocal reducer: low-pass memory for the centre (mid) signal, so bass and kick stay
+    lp: f32,
+    lp_alpha: f32,
 }
 
 impl Equalizer {
     pub fn new(sample_rate: u32, channels: usize, settings: EqSettings) -> Self {
-        let mut e = Equalizer { sample_rate: sample_rate as f32, channels, settings: EqSettings::default(), filters: vec![], preamp: 1.0 };
+        let mut e = Equalizer { sample_rate: sample_rate as f32, channels, settings: EqSettings::default(), filters: vec![], preamp: 1.0, lp: 0.0, lp_alpha: 1.0 - (-2.0 * PI * 150.0 / (sample_rate as f32)).exp() };
         e.set(settings);
         e
     }
@@ -85,6 +92,18 @@ impl Equalizer {
 
     /// Process interleaved samples in place.
     pub fn process(&mut self, buf: &mut [f32]) {
+        // Vocal reduction: take the centre (mid) signal, keep only what is above ~150 Hz, and
+        // subtract it from both channels. Centre-panned vocals fade out; bass and drums stay.
+        let amount = self.settings.vocal_reduction;
+        if self.channels == 2 && amount > 0.0 {
+            for f in buf.chunks_exact_mut(2) {
+                let mid = (f[0] + f[1]) * 0.5;
+                self.lp += self.lp_alpha * (mid - self.lp);
+                let hp = mid - self.lp;
+                f[0] -= amount * hp;
+                f[1] -= amount * hp;
+            }
+        }
         if self.settings.bypass { return; }
         for frame in buf.chunks_mut(self.channels) {
             for (ch, x) in frame.iter_mut().enumerate() {
@@ -104,6 +123,55 @@ mod tests {
         (0..n).map(|i| 0.1 * (2.0 * PI * freq * i as f32 / sr as f32).sin()).collect()
     }
     fn peak(v: &[f32]) -> f32 { v[v.len() / 2..].iter().fold(0.0, |m, x| m.max(x.abs())) }
+
+    fn stereo(l: &[f32], r: &[f32]) -> Vec<f32> { l.iter().zip(r).flat_map(|(a, b)| [*a, *b]).collect() }
+    fn left_peak(b: &[f32]) -> f32 { b.chunks(2).skip(b.len() / 4).fold(0.0, |m, f| m.max(f[0].abs())) }
+
+    #[test]
+    fn vocal_reduction_removes_centre_but_keeps_bass_and_sides() {
+        let mut s = EqSettings::default();
+        s.vocal_reduction = 1.0;
+        // a 1 kHz tone panned dead centre (the "vocal") is almost gone
+        let v = sine(1000.0, 44100, 16000);
+        let mut b = stereo(&v, &v);
+        Equalizer::new(44100, 2, s.clone()).process(&mut b);
+        assert!(left_peak(&b) < 0.01, "centre voice left {}", left_peak(&b));
+        // a 60 Hz centre tone (bass) mostly stays
+        let bass = sine(60.0, 44100, 16000);
+        let mut b = stereo(&bass, &bass);
+        Equalizer::new(44100, 2, s.clone()).process(&mut b);
+        assert!(left_peak(&b) > 0.07, "bass left {}", left_peak(&b));
+        // a tone in the left channel only is not silenced
+        let z = vec![0.0; 16000];
+        let mut b = stereo(&v, &z);
+        Equalizer::new(44100, 2, s).process(&mut b);
+        assert!(left_peak(&b) > 0.04, "side left {}", left_peak(&b));
+    }
+
+    #[test]
+    fn vocal_reduction_off_and_mono_are_untouched() {
+        let v = sine(1000.0, 44100, 8000);
+        let mut b = stereo(&v, &v);
+        let orig = b.clone();
+        Equalizer::new(44100, 2, EqSettings::default()).process(&mut b);
+        assert_eq!(b, orig);
+        let mut s = EqSettings::default();
+        s.vocal_reduction = 1.0;
+        let mut m = v.clone();
+        Equalizer::new(44100, 1, s).process(&mut m);
+        assert_eq!(m, v, "mono has no centre to remove");
+    }
+
+    #[test]
+    fn vocal_reduction_is_clamped_and_old_settings_still_load() {
+        let mut s = EqSettings::default();
+        s.vocal_reduction = 7.0;
+        assert_eq!(s.clone().clamped().vocal_reduction, 1.0);
+        s.vocal_reduction = f32::NAN;
+        assert_eq!(s.clamped().vocal_reduction, 0.0);
+        let old: EqSettings = serde_json::from_str(r#"{"bypass":false,"preamp_db":0.0,"gains_db":[0,0,0,0,0,0,0,0,0,0]}"#).unwrap();
+        assert_eq!(old.vocal_reduction, 0.0);
+    }
 
     #[test]
     fn flat_eq_is_transparent() {

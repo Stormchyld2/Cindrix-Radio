@@ -9,6 +9,7 @@
   import Library from "./lib/Library.svelte";
   import Radio from "./lib/Radio.svelte";
   import Videos from "./lib/Videos.svelte";
+  import Karaoke from "./lib/Karaoke.svelte";
   import Playlists from "./lib/Playlists.svelte";
   import Favorites from "./lib/Favorites.svelte";
   import VideoPlayer from "./lib/VideoPlayer.svelte";
@@ -22,7 +23,7 @@
     folders = await api.folders();
   });
 
-  const nav = ["Dashboard", "Library", "Radio", "Podcasts", "Videos", "Playlists", "Favorites", "Settings"];
+  const nav = ["Dashboard", "Library", "Radio", "Podcasts", "Videos", "Karaoke", "Playlists", "Favorites", "Settings"];
   let active = $state("Dashboard");
   const inTauri = "__TAURI_INTERNALS__" in window;
   async function playFile() {
@@ -63,6 +64,8 @@
       <SettingsView />
     {:else if active === "Radio"}
       <Radio go={(t) => (active = t)} />
+    {:else if active === "Karaoke"}
+      <Karaoke />
     {:else if active === "Playlists"}
       <Playlists />
     {:else if active === "Favorites"}
