@@ -15,6 +15,7 @@ Cindrix Radio is a local-first Windows and Android audio application for podcast
 7. [007 — Media library, podcasts and radio](007-media-library-and-sources.md)
 8. [008 — Security, reliability, testing and delivery](008-quality-and-delivery.md)
 9. [009 — Implementation contracts, cross-platform parity and release gates](009-implementation-contracts.md)
+10. [010 — Settings architecture, subtabs, defaults and safety](010-settings-architecture.md)
 
 ## Locked decisions
 
@@ -29,6 +30,8 @@ Cindrix Radio is a local-first Windows and Android audio application for podcast
 - Smart playlists and user-authored playlists; default **1-second pause between tracks** with configurable gapless option.
 - Two optional widgets: Now Playing and Favorites / Quick Access. Permanent in-app mini-player.
 - Recording of permissible streams, audiobooks, ReplayGain, metadata editing, Car Mode, backup/restore, library integrity, and offline support are approved.
+
+- Settings is one main tab with **16 subtabs** (General, Appearance, Playback, Audio & Equalizer, Devices & Bluetooth, Music Library, Podcasts, Internet Radio, Audiobooks, Karaoke & Lyrics, LAN & Sharing, Downloads & Storage, Privacy & Security, Backup & Restore, Advanced & Diagnostics, About). See [010](010-settings-architecture.md) for complete control/default contracts.
 
 ## Decision policy
 
