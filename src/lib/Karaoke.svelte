@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { isAndroid } from "./platform";
   import { api, type LibItem, type LyricsSummary } from "./api";
   import { player, actions } from "./player.svelte";
   import { store, settingsActions } from "./settings.svelte";
@@ -141,7 +142,7 @@
       <label>Song
         <div class="link">
           <input class="field" placeholder="Start typing the song name…" bind:value={linkText} oninput={linkTyping} aria-label="Song" />
-          <button class="btn" onclick={browse}>Browse…</button>
+          {#if !isAndroid}<button class="btn" onclick={browse}>Browse…</button>{/if}
         </div>
       </label>
       {#if matches.length && !linkPath}

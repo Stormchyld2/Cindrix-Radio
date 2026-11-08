@@ -15,6 +15,9 @@ pub struct Folders {
 }
 
 fn downloads_root() -> PathBuf {
+    #[cfg(target_os = "android")]
+    return PathBuf::from("/storage/emulated/0/Download/Cindrix");
+    #[cfg(not(target_os = "android"))]
     dirs::download_dir()
         .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
         .unwrap_or_else(|| PathBuf::from("Downloads"))

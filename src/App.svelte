@@ -27,6 +27,8 @@
 
   const nav = ["Dashboard", "Library", "Radio", "Podcasts", "Videos", "Karaoke", "Playlists", "Favorites", "Settings"];
   let active = $state("Dashboard");
+  let menu = $state(false);
+  const go = (n: string) => { active = n; menu = false; };
   // keep the position and queue in step with the audio engine
   onMount(() => { const id = setInterval(actions.init, 500); return () => clearInterval(id); });
 </script>
@@ -39,15 +41,17 @@
 
 <div class="shell">
   <header>
+    <button class="burger" aria-label="Menu" aria-expanded={menu} onclick={() => (menu = !menu)}>☰</button>
     <img src="/logo.png" alt="Cindrix Radio" height="36" />
     <button class="mode" class:grid={store.s?.grid_down} onclick={() => settingsActions.setGridDown(!store.s?.grid_down)}
       title="Switch between Online and Grid-Down mode" aria-label="Connection mode: {store.s?.grid_down ? 'Grid-Down' : 'Online'}. Click to switch.">
       <span class="d"></span>{store.s?.grid_down ? "Grid-Down" : "Online"}
     </button>
   </header>
-  <nav>
+  {#if menu}<button class="scrim" aria-label="Close menu" onclick={() => (menu = false)}></button>{/if}
+  <nav class:open={menu}>
     {#each nav as n}
-      <button class="navbtn" class:on={active === n} onclick={() => (active = n)}>{n}</button>
+      <button class="navbtn" class:on={active === n} onclick={() => go(n)}>{n}</button>
     {/each}
   </nav>
 
@@ -114,4 +118,21 @@
   .np{display:flex;flex-direction:column;font-size:13px;min-width:200px}.np span{color:var(--muted)}
   .tx{display:flex;gap:8px}
   .seek{flex:1;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);min-width:0}.seek input{flex:1;min-width:80px}.vol{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
+  .burger,.scrim{display:none}
+  @media (max-width:800px){
+    .shell{grid-template-columns:1fr;grid-template-rows:56px 1fr auto}
+    header{grid-column:1;padding:0 12px;gap:10px}
+    .burger{display:block;width:40px;height:40px;border-radius:10px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:20px}
+    header img{margin-right:auto}
+    nav{position:fixed;z-index:20;top:0;bottom:0;left:0;width:260px;max-width:80vw;background:var(--panel);transform:translateX(-105%);transition:transform .18s;padding-top:24px}
+    nav.open{transform:none}
+    .scrim{display:block;position:fixed;z-index:19;inset:0;border:0;background:#000A}
+    main{padding:14px}
+    main h1{font-size:24px}
+    footer{grid-column:1;flex-wrap:wrap;gap:8px 12px;padding:8px 12px}
+    .np{min-width:0;flex:1 1 55%;overflow:hidden}.np b,.np span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tx .btn{height:40px}
+    .seek{order:5;flex:1 0 100%}
+    .vol{display:none}
+  }
 </style>

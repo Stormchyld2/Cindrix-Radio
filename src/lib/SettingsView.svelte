@@ -62,4 +62,10 @@
   .seg{display:flex;border:1px solid #2A3747;border-radius:12px;overflow:hidden;margin-top:10px;width:320px}
   .seg button{flex:1;height:44px;border:0;background:transparent;color:var(--silver);font-size:15px}
   .seg button.on{background:#1FA8FF18;color:var(--lblue);font-weight:600}
+  @media (max-width:800px){
+    .wrap{flex-direction:column;gap:10px}
+    .sub{width:auto;flex-direction:row;overflow-x:auto;gap:4px}
+    .subbtn{flex:none;white-space:nowrap}
+    .seg{width:100%}
+  }
 </style>

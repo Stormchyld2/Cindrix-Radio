@@ -62,6 +62,8 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - run: npx tauri android init --ci
+      - name: Add permissions, playback service and storage access
+        run: python3 android/patch.py
       - name: Build debug APK (arm64)
         run: npx tauri android build --apk --debug --target aarch64 --ci
       - name: Upload APK

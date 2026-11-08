@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { isAndroid } from "./platform";
   import { api, type Kind, type SourceStatus } from "./api";
 
   const MAX = 5;
@@ -23,7 +24,24 @@
     catch (e) { message = String(e instanceof Error ? e.message : e); }
     finally { busy = null; }
   }
+  // Android has no native folder picker, so folders are chosen from common places or typed in.
+  const phoneFolders: { path: string; kind: Kind; label: string }[] = [
+    { path: "/storage/emulated/0/Music", kind: "Music", label: "Music" },
+    { path: "/storage/emulated/0/Download", kind: "Music", label: "Download" },
+    { path: "/storage/emulated/0/Podcasts", kind: "Podcast", label: "Podcasts" },
+    { path: "/storage/emulated/0/Audiobooks", kind: "Audiobook", label: "Audiobooks" },
+    { path: "/storage/emulated/0/Movies", kind: "Video", label: "Movies" },
+    { path: "/storage/emulated/0/DCIM", kind: "Video", label: "Camera videos" },
+  ];
+  let typed = $state("");
+  async function addPath(path: string, kind: Kind) {
+    const p = path.trim();
+    if (!p) return;
+    const r = await run("Adding…", () => api.libAddSource(p, [kind]));
+    if (r) { sources = r; typed = ""; await scan(r[r.length - 1].source.id); }
+  }
   async function add() {
+    if (isAndroid) return;
     const dir = await open({ directory: true, multiple: false });
     if (typeof dir !== "string") return;
     const r = await run("Adding…", () => api.libAddSource(dir, ["Music"]));
@@ -73,7 +91,18 @@
     </div>
   {/each}
 
-  {#if inTauri}
+  {#if inTauri && isAndroid}
+    <p class="note">Tap a folder on your phone to add it ({MAX - mine.length} slots left), or type a path.</p>
+    <div class="chips">
+      {#each phoneFolders as f}
+        <button class="btn" disabled={!!busy || mine.length >= MAX} onclick={() => addPath(f.path, f.kind)}>{f.label}</button>
+      {/each}
+    </div>
+    <div class="chips">
+      <input class="path-in" placeholder="/storage/emulated/0/…" bind:value={typed} />
+      <button class="btn primary" disabled={!!busy || mine.length >= MAX || !typed.trim()} onclick={() => addPath(typed, "Music")}>Add</button>
+    </div>
+  {:else if inTauri}
     <button class="btn primary" disabled={!!busy || mine.length >= MAX} onclick={add}>
       {mine.length >= MAX ? "All 5 slots used" : `Add drive or folder · ${MAX - mine.length} slots left`}
     </button>
@@ -94,5 +123,7 @@
   .kinds{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:13px}
   .sp{flex:1}
   .status{font-size:13px;color:var(--lblue)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .path-in{flex:1;min-width:0;height:36px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
   button:disabled{opacity:.5;cursor:not-allowed}
 </style>

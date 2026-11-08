@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { isAndroid } from "./platform";
   import { api, type Counts, type Folders, type LibItem, type SourceStatus, type Track } from "./api";
   import { player, actions } from "./player.svelte";
   import { store, settingsActions } from "./settings.svelte";
@@ -50,7 +51,7 @@
     </div>
 
     <div class="card">
-      <div class="head"><h3>Now playing</h3>{#if inTauri}<button class="btn primary" onclick={playFile}>Play a file…</button>{/if}</div>
+      <div class="head"><h3>Now playing</h3>{#if inTauri && !isAndroid}<button class="btn primary" onclick={playFile}>Play a file…</button>{/if}</div>
       {#if cur}
         <div class="np">
           <b>{cur.title}</b>
@@ -147,4 +148,9 @@
   .seg button.on{background:#1FA8FF18;color:var(--lblue)}
   .head{display:flex;justify-content:space-between;align-items:center}
   .err{color:var(--red);font-size:12px;margin:8px 0 0}
+  @media (max-width:800px){
+    .cols{flex-direction:column}
+    aside{width:auto}
+    .tiles{grid-template-columns:repeat(2,1fr)}
+  }
 </style>

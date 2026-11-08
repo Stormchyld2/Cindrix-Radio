@@ -114,7 +114,7 @@
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .bar h3{flex:1}
   .hide{display:none}
-  .field{flex:1;min-width:240px;height:36px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
+  .field{flex:1;min-width:0;height:36px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
   .file{display:inline-flex;align-items:center;cursor:pointer}
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}
   .note{font-size:12px;color:var(--muted);margin:0 0 8px}

@@ -191,7 +191,7 @@
 
 <style>
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
-  .search{flex:1;min-width:260px;height:44px;border-radius:12px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 14px;font-size:15px}
+  .search{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 14px;font-size:15px}
   .file{display:inline-flex;align-items:center;cursor:pointer}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
   .chip{height:30px;padding:0 12px;border-radius:15px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:12px}
@@ -202,7 +202,7 @@
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}
   .sec{margin:18px 0 8px;font-size:18px}.sec span{font-size:12px;color:var(--muted);margin-left:6px;font-family:Inter,sans-serif}
   .note{font-size:13px;color:var(--muted);margin:6px 0}.note.small{font-size:11px;margin-top:18px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:10px}
   .st{display:flex;align-items:center;gap:10px;height:68px;padding:0 12px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
   .st.on{border-color:var(--blue);background:#1FA8FF0F}
   .logo{position:relative;width:44px;height:44px;border-radius:10px;flex:none;overflow:hidden;background:linear-gradient(135deg,#1B2C44,#5F7FA6);display:flex;align-items:center;justify-content:center;font:700 16px Rajdhani,sans-serif;color:#F1F4F8}
