@@ -135,3 +135,19 @@ tests/                       playback, persistence, LAN and DSP validation
 Do not assume a framework choice is already approved: the Tauri 2 vs native Android service split remains pending platform proof of concept.
 
 **Decision record:** v1 product behaviors are approved; implementation/framework and third-party libraries require verification. This file does not override the more detailed specifications in 001–008.
+
+
+## 10. Approved UI navigation and accessibility gates (2026-11-07)
+
+Refer to [005 — UI, Dashboard, Widgets and Theme](005-user-interface.md) for the authoritative layout specification. These are implementation-level release gates and supersede any older suggestion of Android bottom navigation:
+
+- **Windows:** persistent left sidebar is user-resizable, collapses to an icon-only rail and remembers its state; responsive layouts prevent main-page horizontal overflow.
+- **Android:** hamburger menu in the app bar opens a left slide-out drawer holding all primary sections. The drawer closes on destination selection, outside tap, Back and supported swipe gesture; no permanently occupied left panel.
+- **Every screen:** vertical scroll with mouse wheel/trackpad, touch and keyboard while **scrollbar tracks/thumbs remain hidden**. Hiding scrollbar visuals must not disable accessibility or scrolling.
+- **Persistent mini-player:** remains available and shares one playback coordinator; selecting it opens a dedicated expandable/full-screen **Now Playing** page.
+- **Now Playing context:** music, podcast, audiobook and radio show their own relevant controls rather than displaying all controls at once.
+- **Dashboard:** spacious cards with user-configurable visibility/order and saved preferences; overflow content belongs below the fold, not packed into miniature panels.
+- **Unified search:** music, podcasts, audiobooks, playlists and accessible radio catalogs with filters and source availability.
+- **Navigation continuity:** return to the prior section's scroll offset, filters and selection where valid; Android and Windows share user-facing functionality but adapt navigation per platform.
+
+UI testing must include narrow Windows window, desktop wheel and keyboard, Android portrait gestures, screen-reader navigation, drawer accessibility, and hidden-but-functional scroll. These design approvals do not imply implementation is complete.
