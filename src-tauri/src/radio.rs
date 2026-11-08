@@ -144,17 +144,39 @@ fn http() -> Result<reqwest::blocking::Client, String> {
         .build().map_err(|e| e.to_string())
 }
 
-/// Search the directory (most-voted first, broken stations hidden).
-pub fn search(query: &str, tag: Option<&str>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
-    let client = http()?;
+const ORDERS: [&str; 6] = ["votes", "clickcount", "clicktrend", "bitrate", "name", "random"];
+
+fn clean_order(o: Option<&str>) -> &'static str {
+    ORDERS.iter().find(|x| Some(**x) == o).copied().unwrap_or("votes")
+}
+
+fn clean_country(c: Option<&str>) -> Option<String> {
+    c.map(|c| c.trim().to_ascii_uppercase()).filter(|c| c.len() == 2 && c.chars().all(|ch| ch.is_ascii_alphabetic()))
+}
+
+/// What to ask the directory: a typed search looks in station names AND genre tags, a
+/// category looks in each of its tags, and nothing typed returns the top list.
+pub fn plan(query: &str, tags: &[String]) -> Vec<(Option<String>, Option<String>)> {
+    let q = query.trim();
+    let q = if q.is_empty() { None } else { Some(q.to_string()) };
+    let tags: Vec<String> = tags.iter().map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect();
+    if !tags.is_empty() { return tags.into_iter().map(|t| (q.clone(), Some(t))).collect(); }
+    match q {
+        None => vec![(None, None)],
+        Some(q) => vec![(Some(q.clone()), None), (None, Some(q))],
+    }
+}
+
+fn search_one(client: &reqwest::blocking::Client, name: Option<&str>, tag: Option<&str>, order: &str, cc: Option<&str>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
     let mut last = String::from("No directory server answered");
     for server in servers() {
         let mut url = reqwest::Url::parse(&format!("{server}/json/stations/search")).map_err(|e| e.to_string())?;
         {
             let mut q = url.query_pairs_mut();
-            if !query.trim().is_empty() { q.append_pair("name", query.trim()); }
-            if let Some(t) = tag.filter(|t| !t.trim().is_empty()) { q.append_pair("tag", t.trim()); }
-            q.append_pair("order", "votes").append_pair("reverse", "true").append_pair("hidebroken", "true")
+            if let Some(n) = name { q.append_pair("name", n); }
+            if let Some(t) = tag { q.append_pair("tag", t); }
+            if let Some(c) = cc { q.append_pair("countrycode", c); }
+            q.append_pair("order", order).append_pair("reverse", "true").append_pair("hidebroken", "true")
                 .append_pair("limit", &limit.to_string()).append_pair("offset", &offset.to_string());
         }
         match client.get(url).send().and_then(|r| r.error_for_status()).and_then(|r| r.text()) {
@@ -163,6 +185,25 @@ pub fn search(query: &str, tag: Option<&str>, limit: u32, offset: u32) -> Result
         }
     }
     Err(last)
+}
+
+/// Search the directory by station name, genre tag, category and country, ordered by
+/// votes, plays or trend. Broken stations are hidden.
+pub fn search(query: &str, tags: &[String], order: Option<&str>, country: Option<&str>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
+    let client = http()?;
+    let (order, cc) = (clean_order(order), clean_country(country));
+    let jobs = plan(query, tags);
+    let mut out: Vec<Station> = Vec::new();
+    let mut errors = Vec::new();
+    for (name, tag) in &jobs {
+        match search_one(&client, name.as_deref(), tag.as_deref(), order, cc.as_deref(), limit, offset) {
+            Ok(rows) => for r in rows { if !out.iter().any(|o| o.id == r.id || o.url == r.url) { out.push(r); } },
+            Err(e) => errors.push(e),
+        }
+    }
+    if out.is_empty() && errors.len() == jobs.len() { return Err(errors.remove(0)); }
+    out.truncate(limit as usize);
+    Ok(out)
 }
 
 /// Tell the directory a station was played (it asks apps to do this so popularity stays
@@ -234,6 +275,25 @@ mod tests {
         std::fs::write(dir.join("radio_stations.json"), "{ nope").unwrap();
         assert!(StationStore::load(dir.join("radio_stations.json")).list().is_empty());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn typed_search_looks_in_names_and_genres() {
+        assert_eq!(plan("country", &[]), vec![(Some("country".into()), None), (None, Some("country".into()))]);
+        assert_eq!(plan("  ", &[]), vec![(None, None)]);
+        let t = vec!["prepper".to_string(), "survival".to_string()];
+        assert_eq!(plan("", &t), vec![(None, Some("prepper".into())), (None, Some("survival".into()))]);
+        assert_eq!(plan("fm", &t[..1]), vec![(Some("fm".into()), Some("prepper".into()))]);
+    }
+
+    #[test]
+    fn sort_and_country_are_checked() {
+        assert_eq!(clean_order(Some("clickcount")), "clickcount");
+        assert_eq!(clean_order(Some("drop table")), "votes");
+        assert_eq!(clean_order(None), "votes");
+        assert_eq!(clean_country(Some("us")).as_deref(), Some("US"));
+        assert_eq!(clean_country(Some("usa")), None);
+        assert_eq!(clean_country(Some("1;")), None);
     }
 
     #[test]

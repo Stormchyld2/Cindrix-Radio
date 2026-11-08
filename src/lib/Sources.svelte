@@ -13,6 +13,8 @@
   let message = $state<string | null>(null);
   const inTauri = "__TAURI_INTERNALS__" in window;
 
+  const mine = $derived(sources.filter((x) => !x.source.builtin));
+
   onMount(async () => { sources = await api.libSources(); });
 
   async function run<T>(label: string, job: () => Promise<T>): Promise<T | undefined> {
@@ -48,7 +50,7 @@
 <div class="card">
   <div class="head">
     <h3>Library &amp; Sources</h3>
-    <span class="note">{sources.length} of {MAX} used</span>
+    <span class="note">{mine.length} of {MAX} used</span>
   </div>
   <p class="note">Pick up to {MAX} drives or folders. Files stay where they are. Cindrix Radio only reads them and never copies, moves or deletes them.</p>
 
@@ -61,18 +63,19 @@
       </div>
       <div class="kinds">
         {#each kinds as k}
-          <label><input type="checkbox" checked={s.source.kinds.includes(k.k)} disabled={!!busy} onchange={() => toggle(s, k.k)} /> {k.label}</label>
+          <label><input type="checkbox" checked={s.source.kinds.includes(k.k)} disabled={!!busy || s.source.builtin} onchange={() => toggle(s, k.k)} /> {k.label}</label>
         {/each}
         <span class="sp"></span>
         <button class="btn" disabled={!!busy || !s.online} onclick={() => scan(s.source.id)}>Rescan</button>
-        <button class="btn" disabled={!!busy} onclick={() => remove(s)}>Remove</button>
+        {#if s.source.builtin}<span class="note">Built in. Your Downloads/Cindrix folder.</span>
+        {:else}<button class="btn" disabled={!!busy} onclick={() => remove(s)}>Remove</button>{/if}
       </div>
     </div>
   {/each}
 
   {#if inTauri}
-    <button class="btn primary" disabled={!!busy || sources.length >= MAX} onclick={add}>
-      {sources.length >= MAX ? "All 5 slots used" : `Add drive or folder · ${MAX - sources.length} slots left`}
+    <button class="btn primary" disabled={!!busy || mine.length >= MAX} onclick={add}>
+      {mine.length >= MAX ? "All 5 slots used" : `Add drive or folder · ${MAX - mine.length} slots left`}
     </button>
   {:else}
     <p class="note">Adding folders works in the desktop app.</p>

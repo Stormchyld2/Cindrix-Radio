@@ -289,8 +289,16 @@ async fn library_scan(lib: State<'_, LibraryStore>, id: Option<String>) -> Resul
 }
 
 #[tauri::command]
-fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, genre: Option<String>, limit: usize, offset: usize) -> Page {
-    lib.search(&query, kind, genre.as_deref(), limit.min(2000), offset)
+fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, genre: Option<String>, artist: Option<String>, album: Option<String>, limit: usize, offset: usize) -> Page {
+    lib.search(&query, kind, genre.as_deref(), artist.as_deref(), album.as_deref(), limit.min(2000), offset)
+}
+
+#[tauri::command]
+fn library_artists(lib: State<LibraryStore>, kind: Option<Kind>, query: String) -> Vec<(String, usize)> { lib.artists(kind, &query) }
+
+#[tauri::command]
+fn library_albums(lib: State<LibraryStore>, kind: Option<Kind>, query: String, artist: Option<String>) -> Vec<library::AlbumRow> {
+    lib.albums(kind, &query, artist.as_deref())
 }
 
 #[tauri::command]
@@ -325,9 +333,9 @@ async fn radio_probe(settings: State<'_, AppSettings>, url: String) -> Result<st
 }
 
 #[tauri::command]
-async fn radio_search(settings: State<'_, AppSettings>, query: String, tag: Option<String>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
+async fn radio_search(settings: State<'_, AppSettings>, query: String, tags: Vec<String>, order: Option<String>, country: Option<String>, limit: u32, offset: u32) -> Result<Vec<Station>, String> {
     online_or_err(&settings)?;
-    blocking(move || radio::search(&query, tag.as_deref(), limit.min(100), offset)).await
+    blocking(move || radio::search(&query, &tags, order.as_deref(), country.as_deref(), limit.min(100), offset)).await
 }
 
 #[tauri::command]
@@ -375,7 +383,11 @@ pub fn run() {
             app.manage(Engine::start(loaded.eq.clone(), 0.8));
             app.manage(StationStore::load(std::path::PathBuf::from(paths::default_folders().radio).join("radio_stations.json")));
             app.manage(HistoryStore::load(dir.join("playback_history.json")));
-            app.manage(LibraryStore::load(dir.join("library.json")));
+            let lib = LibraryStore::load(dir.join("library.json"));
+            let folders = paths::default_folders();
+            let _ = paths::ensure(&folders);
+            lib.ensure_builtin(&folders.root);
+            app.manage(lib);
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             Ok(())
@@ -387,7 +399,7 @@ pub fn run() {
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
-            library_scan, library_search, library_genres, library_counts,
+            library_scan, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record
         ])
         .run(tauri::generate_context!())

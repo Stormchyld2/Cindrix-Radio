@@ -81,7 +81,7 @@ mod tests {
     use super::*;
     use crate::player::Kind;
 
-    fn src(id: &str, path: &str) -> Source { Source { id: id.into(), path: path.into(), kinds: vec![Kind::Audiobook] } }
+    fn src(id: &str, path: &str) -> Source { Source { id: id.into(), path: path.into(), kinds: vec![Kind::Audiobook], builtin: false } }
     fn temp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("cindrix-hist-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);

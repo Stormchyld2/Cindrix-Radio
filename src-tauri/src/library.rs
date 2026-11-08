@@ -17,6 +17,9 @@ pub struct Source {
     pub path: String,
     /// Which kinds of media to pull from this source: Music, Podcast, Audiobook, Video.
     pub kinds: Vec<Kind>,
+    /// The app's own Downloads/Cindrix folder: always present, not counted in the 5, not removable.
+    #[serde(default)]
+    pub builtin: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -55,6 +58,9 @@ pub struct ScanSummary { pub scanned: usize, pub added: usize, pub skipped_offli
 
 #[derive(Serialize, Clone, Debug)]
 pub struct Page { pub items: Vec<Item>, pub total: usize }
+
+#[derive(Serialize, Clone, Debug)]
+pub struct AlbumRow { pub album: String, pub artist: String, pub count: usize }
 
 #[derive(Serialize, Clone, Debug)]
 pub struct Counts { pub music: usize, pub podcast: usize, pub audiobook: usize, pub video: usize }
@@ -128,8 +134,12 @@ fn scan_source(src: &Source) -> Vec<Item> {
         let stem = f.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let rel = f.strip_prefix(root).unwrap_or(&f);
         let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-        // genre folder = first folder under the source root, only when the file is nested at least 2 deep
-        let folder_genre = if comps.len() >= 3 { Some(comps[0].clone()) } else { None };
+        // Radio recordings live in Downloads/Cindrix/Radio and are not library music
+        if src.builtin && comps.first().map_or(false, |c| c.eq_ignore_ascii_case("radio")) { continue; }
+        // genre folder = first folder under the source root (under the Music/Videos folder for
+        // the built-in downloads source), only when the file is nested at least 2 deep
+        let g = if src.builtin && comps.len() > 1 { &comps[1..] } else { &comps[..] };
+        let folder_genre = if g.len() >= 3 { Some(g[0].clone()) } else { None };
         let group = f.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let path = f.to_string_lossy().to_string();
         let dir = f.parent().unwrap_or(root).to_path_buf();
@@ -172,6 +182,17 @@ impl LibraryStore {
         if std::fs::write(&tmp, serde_json::to_string(d).unwrap()).is_ok() { let _ = std::fs::rename(tmp, &self.path); }
     }
 
+    /// Make sure the built-in Downloads/Cindrix source exists and points at the current folder.
+    pub fn ensure_builtin(&self, root: &str) {
+        let mut d = self.data.lock().unwrap();
+        let all = vec![Kind::Music, Kind::Podcast, Kind::Audiobook, Kind::Video];
+        match d.sources.iter_mut().find(|s| s.id == "downloads") {
+            Some(s) => { s.path = root.to_string(); s.builtin = true; s.kinds = all; }
+            None => d.sources.insert(0, Source { id: "downloads".into(), path: root.to_string(), kinds: all, builtin: true }),
+        }
+        self.save(&d);
+    }
+
     pub fn source_list(&self) -> Vec<Source> { self.data.lock().unwrap().sources.clone() }
 
     pub fn statuses(&self) -> Vec<SourceStatus> {
@@ -188,9 +209,9 @@ impl LibraryStore {
         if kinds.is_empty() { return Err("Pick at least one kind of media for this source".into()); }
         if !Path::new(path).is_dir() { return Err("That folder was not found".into()); }
         let mut d = self.data.lock().unwrap();
-        if d.sources.len() >= MAX_SOURCES { return Err(format!("You can use up to {MAX_SOURCES} sources. Remove one first.")); }
+        if d.sources.iter().filter(|s| !s.builtin).count() >= MAX_SOURCES { return Err(format!("You can use up to {MAX_SOURCES} sources. Remove one first.")); }
         if d.sources.iter().any(|s| s.path == path) { return Err("That folder is already a source".into()); }
-        d.sources.push(Source { id: format!("{:08x}", fnv(path) as u32), path: path.to_string(), kinds });
+        d.sources.push(Source { id: format!("{:08x}", fnv(path) as u32), path: path.to_string(), kinds, builtin: false });
         self.save(&d);
         Ok(())
     }
@@ -198,6 +219,7 @@ impl LibraryStore {
     /// Removes the source from the app only. Files on the drive are never touched.
     pub fn remove_source(&self, id: &str) {
         let mut d = self.data.lock().unwrap();
+        if d.sources.iter().any(|s| s.id == id && s.builtin) { return; }
         d.sources.retain(|s| s.id != id);
         d.items.retain(|i| i.source_id != id);
         self.save(&d);
@@ -207,7 +229,7 @@ impl LibraryStore {
         let kinds: Vec<Kind> = kinds.into_iter().filter(is_media_kind).collect();
         if kinds.is_empty() { return Err("Pick at least one kind of media".into()); }
         let mut d = self.data.lock().unwrap();
-        if let Some(s) = d.sources.iter_mut().find(|s| s.id == id) { s.kinds = kinds; }
+        if let Some(s) = d.sources.iter_mut().find(|s| s.id == id && !s.builtin) { s.kinds = kinds; }
         self.save(&d);
         Ok(())
     }
@@ -236,19 +258,45 @@ impl LibraryStore {
         d.sources.iter().filter(|s| Path::new(&s.path).is_dir()).map(|s| s.id.clone()).collect()
     }
 
-    pub fn search(&self, q: &str, kind: Option<Kind>, genre: Option<&str>, limit: usize, offset: usize) -> Page {
+    pub fn search(&self, q: &str, kind: Option<Kind>, genre: Option<&str>, artist: Option<&str>, album: Option<&str>, limit: usize, offset: usize) -> Page {
         let d = self.data.lock().unwrap();
         let online = Self::online_ids(&d);
         let q = q.trim().to_lowercase();
         let hits: Vec<&Item> = d.items.iter().filter(|i| {
             kind.as_ref().map_or(true, |k| &i.kind == k)
                 && genre.map_or(true, |g| i.folder_genre.as_deref().or(i.genre.as_deref()) == Some(g))
-                && (q.is_empty() || [&i.title, &i.artist, &i.album, &i.group, &i.path].iter().any(|f| f.to_lowercase().contains(&q)))
+                && artist.map_or(true, |a| i.artist == a)
+                && album.map_or(true, |a| i.album == a)
+                && (q.is_empty()
+                    || [&i.title, &i.artist, &i.album, &i.group, &i.path].iter().any(|f| f.to_lowercase().contains(&q))
+                    || i.genre.iter().chain(i.folder_genre.iter()).any(|g| g.to_lowercase().contains(&q)))
         }).collect();
         let total = hits.len();
         let mut items: Vec<Item> = hits.into_iter().skip(offset).take(limit).cloned().collect();
         for i in items.iter_mut() { i.available = online.contains(&i.source_id); }
         Page { items, total }
+    }
+
+    pub fn artists(&self, kind: Option<Kind>, q: &str) -> Vec<(String, usize)> {
+        let d = self.data.lock().unwrap();
+        let q = q.trim().to_lowercase();
+        let mut m: BTreeMap<String, usize> = BTreeMap::new();
+        for i in d.items.iter().filter(|i| kind.as_ref().map_or(true, |k| &i.kind == k) && !i.artist.is_empty()) {
+            if q.is_empty() || i.artist.to_lowercase().contains(&q) { *m.entry(i.artist.clone()).or_default() += 1; }
+        }
+        m.into_iter().collect()
+    }
+
+    pub fn albums(&self, kind: Option<Kind>, q: &str, artist: Option<&str>) -> Vec<AlbumRow> {
+        let d = self.data.lock().unwrap();
+        let q = q.trim().to_lowercase();
+        let mut m: BTreeMap<(String, String), usize> = BTreeMap::new();
+        for i in d.items.iter().filter(|i| kind.as_ref().map_or(true, |k| &i.kind == k) && !i.album.is_empty()) {
+            if artist.map_or(true, |a| i.artist == a) && (q.is_empty() || i.album.to_lowercase().contains(&q)) {
+                *m.entry((i.album.clone(), i.artist.clone())).or_default() += 1;
+            }
+        }
+        m.into_iter().map(|((album, artist), count)| AlbumRow { album, artist, count }).collect()
     }
 
     pub fn genres(&self, kind: Option<Kind>) -> Vec<(String, usize)> {
@@ -307,15 +355,15 @@ mod tests {
         store.add_source(root.to_str().unwrap(), vec![Kind::Music, Kind::Video]).unwrap();
         let sum = store.scan(None);
         assert_eq!(sum.scanned, 3);
-        let all = store.search("", None, None, 100, 0);
+        let all = store.search("", None, None, None, None, 100, 0);
         assert_eq!(all.total, 3);
         let whistle = all.items.iter().find(|i| i.title == "Lonesome Whistle").unwrap();
         assert_eq!(whistle.folder_genre.as_deref(), Some("Country"));
         let rock = all.items.iter().find(|i| i.title == "Song One").unwrap();
         assert_eq!(rock.folder_genre, None, "file directly in a top folder is not genre-nested");
-        assert_eq!(store.search("whistle", None, None, 10, 0).total, 1);
-        assert_eq!(store.search("", Some(Kind::Video), None, 10, 0).total, 1);
-        assert_eq!(store.search("", None, Some("Country"), 10, 0).total, 1);
+        assert_eq!(store.search("whistle", None, None, None, None, 10, 0).total, 1);
+        assert_eq!(store.search("", Some(Kind::Video), None, None, None, 10, 0).total, 1);
+        assert_eq!(store.search("", None, Some("Country"), None, None, 10, 0).total, 1);
         let c = store.counts();
         assert_eq!((c.music, c.video), (2, 1));
         let _ = fs::remove_dir_all(root);
@@ -330,7 +378,7 @@ mod tests {
         let store = LibraryStore::load(root.join("idx.json"));
         store.add_source(root.to_str().unwrap(), vec![Kind::Podcast]).unwrap();
         store.scan(None);
-        let all = store.search("", None, None, 10, 0);
+        let all = store.search("", None, None, None, None, 10, 0);
         let one = all.items.iter().find(|i| i.path.ends_with("ep1.mp3")).unwrap();
         assert_eq!(one.title, "Clean Title");
         assert_eq!(one.published.as_deref(), Some("2026-11-08"));
@@ -351,7 +399,7 @@ mod tests {
         fs::remove_dir_all(&drive).unwrap(); // drive unplugged
         let sum = store.scan(None);
         assert_eq!(sum.skipped_offline.len(), 1);
-        let page = store.search("", None, None, 10, 0);
+        let page = store.search("", None, None, None, None, 10, 0);
         assert_eq!(page.total, 1, "index kept");
         assert!(!page.items[0].available, "marked unavailable, not deleted");
         let _ = fs::remove_dir_all(root);
@@ -377,6 +425,47 @@ mod tests {
     }
 
     #[test]
+    fn music_search_covers_genre_artist_and_album() {
+        let root = temp("music");
+        touch(&root.join("Country/Hank/Greatest/a.mp3"));
+        touch(&root.join("Country/Hank/Greatest/b.mp3"));
+        touch(&root.join("Rock/Band/Debut/c.mp3"));
+        let store = LibraryStore::load(root.join("idx.json"));
+        store.add_source(root.to_str().unwrap(), vec![Kind::Music]).unwrap();
+        store.scan(None);
+        assert_eq!(store.search("country", None, None, None, None, 10, 0).total, 2, "genre is searchable");
+        assert_eq!(store.search("", None, None, None, Some("Greatest"), 10, 0).total, 0, "no tags in test files, so no album names");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn builtin_downloads_source_is_always_there_and_protected() {
+        let root = temp("builtin");
+        let dl = root.join("Cindrix");
+        touch(&dl.join("Music/Country/Hank/Greatest/song.mp3"));
+        touch(&dl.join("Radio/Station 2026.mp3"));
+        touch(&dl.join("Podcasts/Show/ep.mp3"));
+        let store = LibraryStore::load(root.join("idx.json"));
+        store.ensure_builtin(dl.to_str().unwrap());
+        store.scan(None);
+        let all = store.search("", None, None, None, None, 10, 0);
+        assert_eq!(all.total, 2, "radio recordings are not library music");
+        let song = all.items.iter().find(|i| i.title == "song").unwrap();
+        assert_eq!(song.kind, Kind::Music);
+        assert_eq!(song.folder_genre.as_deref(), Some("Country"), "the Music folder is not a genre");
+        assert_eq!(all.items.iter().find(|i| i.title == "ep").unwrap().kind, Kind::Podcast);
+        store.remove_source("downloads");
+        assert_eq!(store.statuses().len(), 1, "built-in source cannot be removed");
+        for i in 0..5 {
+            let d = root.join(format!("d{i}"));
+            fs::create_dir_all(&d).unwrap();
+            store.add_source(d.to_str().unwrap(), vec![Kind::Music]).unwrap();
+        }
+        assert_eq!(store.statuses().len(), 6, "built-in does not use up one of the 5 slots");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn source_needs_a_media_kind() {
         let root = temp("kinds");
         let store = LibraryStore::load(root.join("idx.json"));
@@ -394,7 +483,7 @@ mod tests {
         store.scan(None);
         store.remove_source(&store.statuses()[0].source.id.clone());
         assert!(f.exists());
-        assert_eq!(store.search("", None, None, 10, 0).total, 0);
+        assert_eq!(store.search("", None, None, None, None, 10, 0).total, 0);
         let _ = fs::remove_dir_all(root);
     }
 }

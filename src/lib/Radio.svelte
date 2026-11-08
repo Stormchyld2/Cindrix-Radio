@@ -6,11 +6,35 @@
 
   let { go }: { go: (tab: string) => void } = $props();
 
-  const tags = ["News", "Talk", "Weather", "Country", "Rock", "Classical", "Jazz", "Christian", "Oldies", "Public radio"];
+  // Each chip is a type of station and maps to the directory tags that describe it.
+  const cats: { label: string; tags: string[]; group: "type" | "music" }[] = [
+    { label: "Talk", tags: ["talk"], group: "type" },
+    { label: "News", tags: ["news"], group: "type" },
+    { label: "Weather", tags: ["weather"], group: "type" },
+    { label: "Prepper & survival", tags: ["prepper", "survival", "preparedness"], group: "type" },
+    { label: "Public radio", tags: ["public radio", "npr"], group: "type" },
+    { label: "Christian", tags: ["christian", "gospel"], group: "type" },
+    { label: "Country", tags: ["country"], group: "music" },
+    { label: "Rock", tags: ["rock"], group: "music" },
+    { label: "Classic rock", tags: ["classic rock"], group: "music" },
+    { label: "Oldies", tags: ["oldies"], group: "music" },
+    { label: "Pop", tags: ["pop"], group: "music" },
+    { label: "Hip hop", tags: ["hip hop"], group: "music" },
+    { label: "Jazz", tags: ["jazz"], group: "music" },
+    { label: "Blues", tags: ["blues"], group: "music" },
+    { label: "Bluegrass", tags: ["bluegrass"], group: "music" },
+    { label: "Folk", tags: ["folk"], group: "music" },
+    { label: "Classical", tags: ["classical"], group: "music" },
+  ];
+  const sorts = [["votes", "Most voted"], ["clickcount", "Most played"], ["clicktrend", "Trending"], ["bitrate", "Best quality"], ["name", "A to Z"]];
+  const countries = [["", "Any country"], ["US", "United States"], ["CA", "Canada"], ["GB", "United Kingdom"], ["AU", "Australia"]];
+  let tag = $state<string | null>(null);
+  let order = $state("votes");
+  let country = $state("");
+  const cat = $derived(cats.find((c) => c.label === tag));
   let saved = $state<Station[]>([]);
   let found = $state<Station[]>([]);
   let query = $state("");
-  let tag = $state<string | null>(null);
   let busy = $state<string | null>(null);
   let message = $state<string | null>(null);
   let adding = $state(false);
@@ -20,7 +44,7 @@
   const savedIds = $derived(new Set(saved.map((s) => s.id)));
   const q = $derived(query.trim().toLowerCase());
   // saved stations that match the search, then directory results that are not already saved
-  const mine = $derived(saved.filter((s) => (!q || `${s.name} ${s.tags ?? ""}`.toLowerCase().includes(q)) && (!tag || (s.tags ?? "").toLowerCase().includes(tag.toLowerCase()))));
+  const mine = $derived(saved.filter((s) => (!q || `${s.name} ${s.tags ?? ""}`.toLowerCase().includes(q)) && (!cat || cat.tags.some((t) => (s.tags ?? "").toLowerCase().includes(t))) && (!country || s.country === country)));
   const more = $derived(found.filter((s) => !savedIds.has(s.id)));
 
   async function load() {
@@ -29,13 +53,14 @@
   }
   async function search() {
     if (gridDown) { found = []; return; }
-    try { found = await api.radioSearch(query, tag, 40, 0); message = null; }
+    try { found = await api.radioSearch(query, cat?.tags ?? [], order, country || null, 40, 0); message = null; }
     catch (e) { found = []; message = String(e instanceof Error ? e.message : e); }
   }
   onMount(load);
   $effect(() => { gridDown; search(); });
   const typing = () => { clearTimeout(timer); timer = setTimeout(search, 300); };
   const pickTag = (t: string) => { tag = tag === t ? null : t; search(); };
+  const changed = () => search();
 
   async function run<T>(label: string, job: () => Promise<T>): Promise<T | undefined> {
     busy = label; message = null;
@@ -81,7 +106,7 @@
 </script>
 
 <div class="bar">
-  <input class="search" placeholder="Search your stations and the Radio Browser directory…" bind:value={query} oninput={typing} />
+  <input class="search" placeholder="Search by station name or genre (country, rock, talk…)" bind:value={query} oninput={typing} />
   <button class="btn" onclick={() => (adding = true)} disabled={gridDown}>Add by URL</button>
   <label class="btn file">Import list<input type="file" accept=".m3u,.m3u8,.pls,.txt" onchange={importList} hidden /></label>
   <button class="btn" onclick={() => go("Playlists")}>Playlists</button>
@@ -94,7 +119,16 @@
   </div>
 {:else}
   <div class="chips">
-    {#each tags as t}<button class="chip" class:on={tag === t} onclick={() => pickTag(t)}>{t}</button>{/each}
+    <span class="lab">Type</span>
+    {#each cats.filter((c) => c.group === "type") as c}<button class="chip" class:on={tag === c.label} onclick={() => pickTag(c.label)}>{c.label}</button>{/each}
+  </div>
+  <div class="chips">
+    <span class="lab">Music</span>
+    {#each cats.filter((c) => c.group === "music") as c}<button class="chip" class:on={tag === c.label} onclick={() => pickTag(c.label)}>{c.label}</button>{/each}
+  </div>
+  <div class="chips">
+    <select class="sel" aria-label="Sort stations" bind:value={order} onchange={changed}>{#each sorts as [v, l]}<option value={v}>{l}</option>{/each}</select>
+    <select class="sel" aria-label="Country" bind:value={country} onchange={changed}>{#each countries as [v, l]}<option value={v}>{l}</option>{/each}</select>
   </div>
   {#if busy}<p class="status">{busy}</p>{/if}
   {#if message}<p class="status" class:err={message.startsWith("Directory") || message.startsWith("Could") || message.includes("not")}>{message}</p>{/if}
@@ -126,7 +160,7 @@
     <p class="note">{saved.length ? "None of your saved stations match." : "No saved stations yet. Tap the heart on any station below, or add one by URL."}</p>
   {/if}
 
-  <h3 class="sec">{q || tag ? "From Radio Browser" : "Popular on Radio Browser"} <span>{more.length}</span></h3>
+  <h3 class="sec">{q || tag ? "From Radio Browser" : `Popular on Radio Browser · ${sorts.find((x) => x[0] === order)?.[1]}`} <span>{more.length}</span></h3>
   {#if more.length}
     <div class="grid">{#each more as s (s.id)}{@render card(s, false)}{/each}</div>
   {:else}
@@ -161,6 +195,8 @@
   .file{display:inline-flex;align-items:center;cursor:pointer}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
   .chip{height:30px;padding:0 12px;border-radius:15px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:12px}
+  .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;align-self:center;width:44px}
+  .sel{height:34px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 10px;font-size:13px}
   .chip.on{border-color:var(--blue);color:var(--lblue);background:#1FA8FF14}
   .gd{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:14px}
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}

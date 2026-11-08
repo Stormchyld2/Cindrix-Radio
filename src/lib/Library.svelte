@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Counts, type Kind, type LibItem } from "./api";
+  import { api, type AlbumRow, type Counts, type Kind, type LibItem } from "./api";
   import { actions } from "./player.svelte";
 
   const types: { kind: Kind; label: string; key: keyof Counts }[] = [
@@ -12,6 +12,11 @@
   let kind = $state<Kind>("Music");
   let query = $state("");
   let genre = $state<string | null>(null);
+  let artist = $state<string | null>(null);
+  let album = $state<string | null>(null);
+  let view = $state<"songs" | "artists" | "albums" | "genres">("songs");
+  let artists = $state<[string, number][]>([]);
+  let albums = $state<AlbumRow[]>([]);
   let counts = $state<Counts>({ music: 0, podcast: 0, audiobook: 0, video: 0 });
   let genres = $state<[string, number][]>([]);
   let items = $state<LibItem[]>([]);
@@ -19,17 +24,27 @@
   let timer: ReturnType<typeof setTimeout>;
 
   async function refresh() {
-    const [p, g, c] = await Promise.all([api.libSearch(query, kind, genre, 200, 0), api.libGenres(kind), api.libCounts()]);
-    items = p.items; total = p.total; genres = g; counts = c;
+    const music = kind === "Music";
+    const [p, g, c, ar, al] = await Promise.all([
+      api.libSearch(query, kind, genre, artist, album, 200, 0), api.libGenres(kind), api.libCounts(),
+      music && view === "artists" ? api.libArtists(kind, query) : Promise.resolve([] as [string, number][]),
+      music && view === "albums" ? api.libAlbums(kind, query, artist) : Promise.resolve([] as AlbumRow[]),
+    ]);
+    items = p.items; total = p.total; genres = g; counts = c; artists = ar; albums = al;
   }
-  onMount(refresh);
-  const pick = (k: Kind) => { kind = k; genre = null; refresh(); };
+  // the built-in Downloads/Cindrix folder is refreshed whenever the Library opens
+  onMount(async () => { await refresh(); try { await api.libScan("downloads"); await refresh(); } catch { /* browser preview */ } });
+  const pick = (k: Kind) => { kind = k; genre = null; artist = null; album = null; view = "songs"; refresh(); };
+  const setView = (v: typeof view) => { view = v; genre = null; artist = null; album = null; refresh(); };
+  const openArtist = (a: string) => { artist = a; album = null; view = "songs"; refresh(); };
+  const openAlbum = (a: AlbumRow) => { artist = a.artist || null; album = a.album; view = "songs"; refresh(); };
+  const openGenre = (g: string | null) => { genre = g; view = "songs"; refresh(); };
   const typing = () => { clearTimeout(timer); timer = setTimeout(refresh, 200); };
 
   const toTrack = (i: LibItem) => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
   const playable = (i: LibItem) => i.kind !== "Video" && i.available;
   async function shuffle() {
-    const p = await api.libSearch(query, kind, genre, 2000, 0);
+    const p = await api.libSearch(query, kind, genre, artist, album, 2000, 0);
     const pool = p.items.filter(playable);
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     if (!pool.length) return;
@@ -45,13 +60,27 @@
   {/each}
 </div>
 
-<input class="search" placeholder="Search {kind === 'Music' ? 'songs, artists, albums' : 'titles'}…" bind:value={query} oninput={typing} />
+<input class="search" placeholder="Search {kind === 'Music' ? 'songs, artists, albums, genres' : 'titles'}…" bind:value={query} oninput={typing} />
 
-{#if genres.length}
+{#if kind === "Music"}
   <div class="genres">
-    <button class="chip" class:on={genre === null} onclick={() => { genre = null; refresh(); }}>All</button>
+    {#each [["songs", "Songs"], ["artists", "Artists"], ["albums", "Albums"], ["genres", "Genres"]] as [v, label]}
+      <button class="chip" class:on={view === v} onclick={() => setView(v as typeof view)}>{label}</button>
+    {/each}
+  </div>
+{/if}
+
+{#if artist || album || genre}
+  <div class="genres">
+    {#if artist}<button class="chip on" onclick={() => { artist = null; album = null; refresh(); }}>Artist: {artist} ✕</button>{/if}
+    {#if album}<button class="chip on" onclick={() => { album = null; refresh(); }}>Album: {album} ✕</button>{/if}
+    {#if genre}<button class="chip on" onclick={() => { genre = null; refresh(); }}>Genre: {genre} ✕</button>{/if}
+  </div>
+{:else if genres.length && !(kind === "Music" && view !== "songs")}
+  <div class="genres">
+    <button class="chip" class:on={genre === null} onclick={() => openGenre(null)}>All</button>
     {#each genres as [g, n]}
-      <button class="chip" class:on={genre === g} onclick={() => { genre = g; refresh(); }}>{g} <span>{n}</span></button>
+      <button class="chip" class:on={genre === g} onclick={() => openGenre(g)}>{g} <span>{n}</span></button>
     {/each}
   </div>
 {/if}
@@ -61,8 +90,26 @@
   <button class="btn primary" disabled={kind === "Video" || !total} onclick={shuffle}>Shuffle</button>
 </div>
 
-{#if total === 0 && !query && !genre}
-  <div class="card empty">Nothing here yet. Add a drive or folder in Settings → Library &amp; Sources, then scan it.</div>
+{#if total === 0 && !query && !genre && !artist && !album}
+  <div class="card empty">Nothing here yet. Music you download lands in Downloads/Cindrix automatically. You can also add drives or folders in Settings → Library &amp; Sources.</div>
+{:else if kind === "Music" && view === "artists"}
+  <div class="rows">
+    {#each artists as [a, n] (a)}
+      <button class="row pick" onclick={() => openArtist(a)}><div class="meta"><b>{a}</b><span>{n} {n === 1 ? "song" : "songs"}</span></div></button>
+    {:else}<p class="note">No artists found. Artists come from the tags in your files.</p>{/each}
+  </div>
+{:else if kind === "Music" && view === "albums"}
+  <div class="rows">
+    {#each albums as a (a.album + a.artist)}
+      <button class="row pick" onclick={() => openAlbum(a)}><div class="meta"><b>{a.album}</b><span>{[a.artist, `${a.count} ${a.count === 1 ? "song" : "songs"}`].filter(Boolean).join(" · ")}</span></div></button>
+    {:else}<p class="note">No albums found. Albums come from the tags in your files.</p>{/each}
+  </div>
+{:else if kind === "Music" && view === "genres"}
+  <div class="rows">
+    {#each genres as [g, n] (g)}
+      <button class="row pick" onclick={() => openGenre(g)}><div class="meta"><b>{g}</b><span>{n} {n === 1 ? "song" : "songs"}</span></div></button>
+    {:else}<p class="note">No genres found. Genres come from tags or from your folder names.</p>{/each}
+  </div>
 {:else}
   <div class="rows">
     {#each items as i (i.id)}
@@ -96,5 +143,7 @@
   .meta{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .meta span,.time{color:var(--muted);font-size:12px}
   .tag{font-size:12px;color:var(--muted)}
+  .pick{width:100%;text-align:left;color:var(--silver);cursor:pointer}
+  .note{font-size:13px;color:var(--muted)}
   button:disabled{opacity:.5;cursor:not-allowed}
 </style>

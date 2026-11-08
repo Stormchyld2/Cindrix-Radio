@@ -13,10 +13,11 @@ export interface Feed { id: string; url: string; title: string; image: string | 
 export interface ImportResult { feeds: Feed[]; failed: string[] }
 
 export interface LibItem { id: string; source_id: string; path: string; kind: Kind; title: string; artist: string; album: string; genre: string | null; folder_genre: string | null; group: string; duration_secs: number | null; published?: string | null; description?: string | null; available: boolean }
-export interface Source { id: string; path: string; kinds: Kind[] }
+export interface Source { id: string; path: string; kinds: Kind[]; builtin?: boolean }
 export interface SourceStatus { source: Source; online: boolean; items: number }
 export interface ScanSummary { scanned: number; added: number; skipped_offline: string[] }
 export interface Page { items: LibItem[]; total: number }
+export interface AlbumRow { album: string; artist: string; count: number }
 export interface Counts { music: number; podcast: number; audiobook: number; video: number }
 
 export interface Station { id: string; name: string; url: string; favicon: string | null; tags: string | null; country: string | null; codec: string | null; bitrate: number | null; rb_uuid: string | null }
@@ -40,7 +41,8 @@ export const api = {
   radioRemove: (id: string) => call<Station[]>("radio_remove", { id }, desktopOnly),
   radioImport: (text: string) => call<ImportStations>("radio_import", { text }, desktopOnly),
   radioProbe: (url: string) => call<StreamInfo>("radio_probe", { url }, desktopOnly),
-  radioSearch: (query: string, tag: string | null, limit: number, offset: number) => call<Station[]>("radio_search", { query, tag, limit, offset }, () => []),
+  radioSearch: (query: string, tags: string[], order: string | null, country: string | null, limit: number, offset: number) =>
+    call<Station[]>("radio_search", { query, tags, order, country, limit, offset }, () => []),
   radioPlay: (station: Station) => call<PlayerState>("radio_play", { station }, desktopOnly),
   radioRecord: (start: boolean, name: string) => call<string | null>("radio_record", { start, name }, desktopOnly),
   libSources: () => call<SourceStatus[]>("library_sources", {}, () => []),
@@ -48,8 +50,10 @@ export const api = {
   libRemoveSource: (id: string) => call<SourceStatus[]>("library_remove_source", { id }, desktopOnly),
   libSetKinds: (id: string, kinds: Kind[]) => call<SourceStatus[]>("library_set_kinds", { id, kinds }, desktopOnly),
   libScan: (id: string | null) => call<ScanSummary>("library_scan", { id }, desktopOnly),
-  libSearch: (query: string, kind: Kind | null, genre: string | null, limit: number, offset: number) =>
-    call<Page>("library_search", { query, kind, genre, limit, offset }, () => ({ items: [], total: 0 })),
+  libSearch: (query: string, kind: Kind | null, genre: string | null, artist: string | null, album: string | null, limit: number, offset: number) =>
+    call<Page>("library_search", { query, kind, genre, artist, album, limit, offset }, () => ({ items: [], total: 0 })),
+  libArtists: (kind: Kind | null, query: string) => call<[string, number][]>("library_artists", { kind, query }, () => []),
+  libAlbums: (kind: Kind | null, query: string, artist: string | null) => call<AlbumRow[]>("library_albums", { kind, query, artist }, () => []),
   libGenres: (kind: Kind | null) => call<[string, number][]>("library_genres", { kind }, () => []),
   libCounts: () => call<Counts>("library_counts", {}, () => ({ music: 0, podcast: 0, audiobook: 0, video: 0 })),
   podcastList: () => call<Feed[]>("podcast_list", {}, () => []),
