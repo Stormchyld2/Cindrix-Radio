@@ -56,6 +56,30 @@ pub fn append_entry(dir: &Path, file: &str, title: &str, date: Option<&str>, des
     std::fs::rename(tmp, path)
 }
 
+/// Set the line for `file`: replace it if there is one, otherwise add it. Other lines,
+/// comments and their order are kept. With every field empty the line is removed.
+pub fn set_entry(dir: &Path, file: &str, title: &str, date: Option<&str>, description: Option<&str>) -> std::io::Result<()> {
+    let path = dir.join("metadata.txt");
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let key = file.to_lowercase();
+    let clear = title.trim().is_empty() && date.map_or(true, |d| d.trim().is_empty()) && description.map_or(true, |d| d.trim().is_empty());
+    let new_line = format!("{} | {} | {} | {}\n", esc(file), esc(title.trim()), date.unwrap_or("").trim(), esc(description.unwrap_or("").trim()));
+    let (mut out, mut placed) = (String::new(), false);
+    for line in existing.lines() {
+        let l = line.trim().trim_start_matches('\u{feff}');
+        let hit = !l.is_empty() && !l.starts_with('#') && split_fields(l)[0].to_lowercase() == key;
+        if !hit { out.push_str(line); out.push('\n'); }
+        else if !placed && !clear { out.push_str(&new_line); placed = true; }
+    }
+    if !placed && !clear {
+        if out.is_empty() { out.push_str("# filename | display title | date (YYYY-MM-DD) | description\n"); }
+        out.push_str(&new_line);
+    }
+    let tmp = dir.join("metadata.txt.tmp");
+    std::fs::write(&tmp, out)?;
+    std::fs::rename(tmp, path)
+}
+
 /// "Mon, 03 Nov 2026 10:00:00 GMT" -> "2026-11-03". Returns None for anything else.
 pub fn iso_date(pub_date: &str) -> Option<String> {
     let s = pub_date.trim();
@@ -115,5 +139,28 @@ mod tests {
         assert_eq!(iso_date("Mon, 03 Nov 2026 10:00:00 GMT").as_deref(), Some("2026-11-03"));
         assert_eq!(iso_date("2026-11-08T10:00:00Z").as_deref(), Some("2026-11-08"));
         assert_eq!(iso_date("garbage"), None);
+    }
+
+    #[test]
+    fn set_entry_adds_replaces_keeps_others_and_clears() {
+        let dir = std::env::temp_dir().join(format!("cindrix-radio-meta-set-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        set_entry(&dir, "Ch1.mp3", "Chapter One", Some("2026-01-02"), Some("Intro | part")).unwrap();
+        set_entry(&dir, "ch2.mp3", "Chapter Two", None, None).unwrap();
+        let m = load_dir(&dir);
+        assert_eq!(m["ch1.mp3"].title.as_deref(), Some("Chapter One"));
+        assert_eq!(m["ch1.mp3"].description.as_deref(), Some("Intro | part"), "pipes survive");
+        set_entry(&dir, "CH1.MP3", "First", Some("2026-02-03"), None).unwrap();
+        let m = load_dir(&dir);
+        assert_eq!(m.len(), 2, "replaced, not duplicated");
+        assert_eq!(m["ch1.mp3"].title.as_deref(), Some("First"));
+        assert_eq!(m["ch1.mp3"].date.as_deref(), Some("2026-02-03"));
+        assert_eq!(m["ch1.mp3"].description, None);
+        assert_eq!(m["ch2.mp3"].title.as_deref(), Some("Chapter Two"), "other lines kept");
+        set_entry(&dir, "ch1.mp3", "", None, Some("  ")).unwrap();
+        let m = load_dir(&dir);
+        assert!(!m.contains_key("ch1.mp3") && m.contains_key("ch2.mp3"), "empty fields remove the line");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

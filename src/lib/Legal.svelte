@@ -14,6 +14,18 @@
 </script>
 
 <div class="legal">
+  <div class="plain">
+    <b>In plain words</b>
+    <ul>
+      <li>Cindrix Radio is a media player. It comes with no music, videos, podcasts or lyrics of its own.</li>
+      <li>What you add, import, paste, record, stream or download is your responsibility. Use it only for your own personal listening and viewing, and only where you have the right to.</li>
+      <li>Downloads are for offline use on your own devices, like the offline feature in other apps. Don't share or sell them.</li>
+      <li>Lyrics you paste stay on your device. They are never uploaded or shared.</li>
+      <li>There are no accounts, ads or tracking. Your library, lyrics and listening history stay on your device. The app only contacts the services you use, such as the radio directory, podcast feeds and the sites you download from.</li>
+      <li>The app is provided as is, with no warranty.</li>
+    </ul>
+    <span>This summary is only a guide. The full documents below are what apply.</span>
+  </div>
   <div class="tabs">
     {#each docs as d}
       <button class="btn" class:on={open === d.id} onclick={() => (open = d.id)}>{d.label}</button>
@@ -27,6 +39,9 @@
 </div>
 
 <style>
+  .plain{border:1px solid var(--blue);background:#1FA8FF0F;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.5}
+  .plain ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+  .plain span{color:var(--muted);font-size:12px}
   .tabs{display:flex;gap:8px;flex-wrap:wrap}
   .btn.on{border-color:var(--blue);color:var(--lblue);background:#1FA8FF14}
   .meta{font-size:12px;color:var(--muted)}

@@ -246,16 +246,20 @@ fn is_hls(url: &str, ct: &str) -> bool {
     u.ends_with(".m3u8") || ct.to_ascii_lowercase().contains("vnd.apple.mpegurl")
 }
 
-/// Connect to a stream, following one level of .pls/.m3u playlist.
-fn connect(url: &str, depth: u8) -> Result<(reqwest::blocking::Response, StreamInfo), String> {
+enum Conn { Stream(reqwest::blocking::Response, StreamInfo), Hls(String) }
+
+/// Connect to a stream, following one level of .pls/.m3u playlist. HLS is handed back by address.
+fn connect(url: &str, depth: u8) -> Result<Conn, String> {
     if !crate::podcasts::is_http(url) { return Err("A stream address must start with http:// or https://".into()); }
     let resp = client()?.get(url.trim()).header("Icy-MetaData", "1").send()
         .and_then(|r| r.error_for_status()).map_err(|e| format!("Could not connect: {e}"))?;
     let ct = header(&resp, "content-type").unwrap_or_default();
-    if is_hls(url, &ct) { return Err("This is an HLS (.m3u8) stream, which is not supported yet".into()); }
+    if is_hls(url, &ct) { return Ok(Conn::Hls(url.trim().to_string())); }
     if depth == 0 && is_playlist(url, &ct) {
         let mut text = String::new();
         resp.take(65536).read_to_string(&mut text).map_err(|e| e.to_string())?;
+        // some servers label an HLS playlist as a plain .m3u: tell them apart by content
+        if text.contains("#EXT-X-TARGETDURATION") || text.contains("#EXT-X-STREAM-INF") { return Ok(Conn::Hls(url.trim().to_string())); }
         let next = first_url(&text).ok_or("That playlist has no stream address in it")?;
         return connect(&next, 1);
     }
@@ -266,16 +270,34 @@ fn connect(url: &str, depth: u8) -> Result<(reqwest::blocking::Response, StreamI
         bitrate: header(&resp, "icy-br").and_then(|b| b.split(',').next().and_then(|n| n.trim().parse().ok())),
         content_type: Some(ct).filter(|c| !c.is_empty()),
     };
-    Ok((resp, info))
+    Ok(Conn::Stream(resp, info))
 }
 
 /// Check a stream address and report what it is, without decoding it.
-pub fn probe(url: &str) -> Result<StreamInfo, String> { connect(url, 0).map(|(_, i)| i) }
+pub fn probe(url: &str) -> Result<StreamInfo, String> {
+    Ok(match connect(url, 0)? {
+        Conn::Stream(_, info) => info,
+        Conn::Hls(u) => hls_info(&u),
+    })
+}
+
+fn hls_info(url: &str) -> StreamInfo {
+    StreamInfo { url: url.to_string(), content_type: Some("audio/aac".into()), ..Default::default() }
+}
 
 pub struct Opened { pub source: StreamSource, pub info: StreamInfo }
 
 pub fn open(url: &str, now: NowPlaying, rec: Recorder) -> Result<Opened, String> {
-    let (resp, info) = connect(url, 0)?;
+    let (resp, info) = match connect(url, 0)? {
+        Conn::Stream(r, i) => (r, i),
+        Conn::Hls(u) => {
+            // segmented stream: no ICY titles; audio arrives through the HLS reader
+            *now.lock().unwrap() = None;
+            let info = hls_info(&u);
+            let source = StreamSource::new(crate::hls::HlsReader::start(&u, rec)?, Some("aac"))?;
+            return Ok(Opened { source, info });
+        }
+    };
     let metaint = header(&resp, "icy-metaint").and_then(|m| m.parse::<usize>().ok()).unwrap_or(0);
     *now.lock().unwrap() = None;
     let ext = Some(info.extension());

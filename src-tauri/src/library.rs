@@ -236,6 +236,11 @@ impl LibraryStore {
 
     /// Rescan one source (or all when id is None). Offline sources keep their old index
     /// and are reported, never wiped.
+    /// Which source an indexed file belongs to.
+    pub fn source_of(&self, path: &str) -> Option<String> {
+        self.data.lock().unwrap().items.iter().find(|i| i.path == path).map(|i| i.source_id.clone())
+    }
+
     pub fn scan(&self, id: Option<&str>) -> ScanSummary {
         let sources: Vec<Source> = self.data.lock().unwrap().sources.iter()
             .filter(|s| id.map_or(true, |i| i == s.id)).cloned().collect();

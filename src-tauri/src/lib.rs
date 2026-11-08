@@ -1,6 +1,7 @@
 mod dsp;
 mod engine;
 mod history;
+mod hls;
 mod library;
 mod lyrics;
 mod meta;
@@ -337,6 +338,23 @@ async fn library_scan(lib: State<'_, LibraryStore>, id: Option<String>) -> Resul
     blocking(move || Ok(lib.scan(id.as_deref()))).await
 }
 
+/// Edit a file's title, date and description. Saved in the folder's metadata.txt, never in the
+/// file itself, then that source is rescanned so the Library shows it.
+#[tauri::command]
+async fn library_set_details(lib: State<'_, LibraryStore>, path: String, title: String, date: Option<String>, description: Option<String>) -> Result<(), String> {
+    let lib = lib.inner().clone();
+    blocking(move || {
+        let p = std::path::Path::new(&path);
+        let (Some(dir), Some(name)) = (p.parent(), p.file_name().and_then(|n| n.to_str())) else { return Err("Bad file path".to_string()) };
+        if !p.exists() { return Err("That file is not available right now. Is its drive connected?".into()); }
+        let date = date.map(|d| d.trim().to_string()).filter(|d| !d.is_empty());
+        if let Some(d) = &date { if meta::iso_date(d).is_none() || d.len() != 10 { return Err("Use the date format YYYY-MM-DD, like 2026-11-08.".into()); } }
+        meta::set_entry(dir, name, &title, date.as_deref(), description.as_deref()).map_err(|e| format!("Could not save the details: {e}"))?;
+        if let Some(id) = lib.source_of(&path) { lib.scan(Some(&id)); }
+        Ok(())
+    }).await
+}
+
 #[tauri::command]
 fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, genre: Option<String>, artist: Option<String>, album: Option<String>, limit: usize, offset: usize) -> Page {
     lib.search(&query, kind, genre.as_deref(), artist.as_deref(), album.as_deref(), limit.min(2000), offset)
@@ -503,7 +521,7 @@ pub fn run() {
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
-            library_scan, library_search, library_genres, library_counts, library_artists, library_albums,
+            library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
             playlists_get, playlist_create, playlist_rename, playlist_delete, playlist_add, playlist_remove, playlist_shift, favorite_toggle,
             video_sources, video_search, video_download, ytdl_status, ytdl_install

@@ -36,6 +36,19 @@
   }
   // the built-in Downloads/Cindrix folder is refreshed whenever the Library opens
   onMount(async () => { await refresh(); try { await api.libScan("downloads"); await refresh(); } catch { /* browser preview */ } });
+  // ---- edit details (saved in the folder's metadata.txt)
+  const inTauri = "__TAURI_INTERNALS__" in window;
+  let edit = $state<LibItem | null>(null);
+  let eTitle = $state(""); let eDate = $state(""); let eDesc = $state("");
+  let eMsg = $state<string | null>(null);
+  function startEdit(i: LibItem) { edit = i; eTitle = i.title; eDate = i.published ?? ""; eDesc = i.description ?? ""; eMsg = null; }
+  async function saveEdit(clear = false) {
+    if (!edit) return;
+    try {
+      await api.libSetDetails(edit.path, clear ? "" : eTitle, clear ? null : eDate || null, clear ? null : eDesc || null);
+      edit = null; await refresh();
+    } catch (e) { eMsg = String(e instanceof Error ? e.message : e); }
+  }
   const pick = (k: Kind) => { kind = k; genre = null; artist = null; album = null; view = "songs"; refresh(); };
   const setView = (v: typeof view) => { view = v; genre = null; artist = null; album = null; refresh(); };
   const openArtist = (a: string) => { artist = a; album = null; view = "songs"; refresh(); };
@@ -122,9 +135,29 @@
         {#if !i.available}<span class="tag">Unavailable</span>{/if}
         <span class="time">{fmt(i.duration_secs)}</span>
         <AddMenu track={toTrack(i)} />
+        {#if inTauri}<button class="ic" title="Edit title, date and description" aria-label="Edit details for {i.title}" disabled={!i.available} onclick={() => startEdit(i)}>✎</button>{/if}
         <button class="btn" disabled={!playable(i)} onclick={() => actions.enqueue(toTrack(i))}>+ Queue</button>
       </div>
     {/each}
+  </div>
+{/if}
+
+{#if edit}
+  <div class="gate" role="dialog" aria-modal="true" aria-label="Edit details">
+    <div class="card box">
+      <h2>Edit details</h2>
+      <p class="note">{edit.kind === "Audiobook" ? "Name a chapter or book part." : "Change how this appears in your Library."} Saved in metadata.txt in the same folder. Your file is never changed.</p>
+      <label>Title<input class="field" bind:value={eTitle} /></label>
+      <label>Date (YYYY-MM-DD, optional)<input class="field" placeholder="2026-11-08" bind:value={eDate} /></label>
+      <label>Description (optional)<textarea class="field area" bind:value={eDesc}></textarea></label>
+      {#if eMsg}<p class="err">{eMsg}</p>{/if}
+      <div class="r">
+        <button class="btn" onclick={() => saveEdit(true)}>Clear details</button>
+        <span class="sp"></span>
+        <button class="btn" onclick={() => (edit = null)}>Cancel</button>
+        <button class="btn primary" onclick={() => saveEdit()}>Save</button>
+      </div>
+    </div>
   </div>
 {/if}
 
@@ -147,6 +180,14 @@
   .meta{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .meta span,.time{color:var(--muted);font-size:12px}
   .tag{font-size:12px;color:var(--muted)}
+  .ic{width:32px;height:32px;border:0;background:transparent;color:var(--muted);font-size:16px;border-radius:8px}
+  .gate{position:fixed;inset:0;background:#000000CC;display:flex;align-items:center;justify-content:center;z-index:20}
+  .box{width:min(520px,94vw);display:flex;flex-direction:column;gap:10px}
+  .box label{display:flex;flex-direction:column;gap:6px;font-size:13px}
+  .field{height:38px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
+  .area{height:120px;padding:10px 12px;resize:vertical;font:14px/1.5 Inter,sans-serif}
+  .r{display:flex;gap:10px;align-items:center}.sp{flex:1}
+  .err{color:var(--red);font-size:13px;margin:0}
   .pick{width:100%;text-align:left;color:var(--silver);cursor:pointer}
   .note{font-size:13px;color:var(--muted)}
   button:disabled{opacity:.5;cursor:not-allowed}

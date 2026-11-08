@@ -75,6 +75,7 @@ export const api = {
   libScan: (id: string | null) => call<ScanSummary>("library_scan", { id }, desktopOnly),
   libSearch: (query: string, kind: Kind | null, genre: string | null, artist: string | null, album: string | null, limit: number, offset: number) =>
     call<Page>("library_search", { query, kind, genre, artist, album, limit, offset }, () => ({ items: [], total: 0 })),
+  libSetDetails: (path: string, title: string, date: string | null, description: string | null) => call<void>("library_set_details", { path, title, date, description }, desktopOnly),
   libArtists: (kind: Kind | null, query: string) => call<[string, number][]>("library_artists", { kind, query }, () => []),
   libAlbums: (kind: Kind | null, query: string, artist: string | null) => call<AlbumRow[]>("library_albums", { kind, query, artist }, () => []),
   libGenres: (kind: Kind | null) => call<[string, number][]>("library_genres", { kind }, () => []),

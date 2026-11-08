@@ -120,8 +120,6 @@ pub fn parse_directory(json: &str) -> Vec<Station> {
     let num = |v: &Value, k: &str| v.get(k).and_then(|x| x.as_u64().or_else(|| x.as_str().and_then(|s| s.trim().parse().ok())));
     rows.iter().filter_map(|v| {
         let url = text(v, "url_resolved").or_else(|| text(v, "url"))?;
-        let hls = v.get("hls").map_or(false, |h| h.as_u64() == Some(1) || h.as_bool() == Some(true));
-        if hls || url.to_ascii_lowercase().split('?').next().unwrap_or("").ends_with(".m3u8") { return None; }
         let uuid = text(v, "stationuuid");
         Some(Station {
             id: id_for(&url, uuid.as_deref()),
@@ -305,11 +303,12 @@ mod tests {
           {"stationuuid":"u-4","name":"No address","url_resolved":""}
         ]"#;
         let list = parse_directory(json);
-        assert_eq!(list.len(), 2, "HLS and address-less stations are left out");
+        assert_eq!(list.len(), 3, "address-less stations are left out; segmented (HLS) ones are kept");
         assert_eq!(list[0].url, "http://x/live");
         assert_eq!(list[0].bitrate, Some(128));
         assert_eq!(list[0].rb_uuid.as_deref(), Some("u-1"));
         assert_eq!(list[1].bitrate, Some(64));
+        assert_eq!(list[2].url, "http://z/a.m3u8");
         assert!(parse_directory("not json").is_empty());
     }
 }
