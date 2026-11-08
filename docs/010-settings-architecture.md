@@ -20,6 +20,7 @@ The values below are **recommended starting defaults** unless marked **LOCKED**.
 ### 01 — General
 | Control | Default and allowed behavior |
 |---|---|
+| Connection mode | **Online / Grid-Down** (two states, no Auto), default Online. Top control on the General page. Grid-Down uses no network at all and shows only local and downloaded content. Also shown as a one-tap switch in the app header and on the dashboard Connectivity card |
 | Startup page | Dashboard; alternatives: Last Opened or another available primary tab |
 | Launch on startup | Off; Windows only, explicit opt-in |
 | Start minimized | Off; Windows only |

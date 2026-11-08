@@ -5,8 +5,8 @@
   import { store, settingsActions } from "./settings.svelte";
 
   // Subtabs are added here as each is built; the full list is in docs/010.
-  const tabs = ["Audio & Equalizer", "Library & Sources", "Karaoke & Lyrics", "Legal"] as const;
-  let tab = $state<(typeof tabs)[number]>("Audio & Equalizer");
+  const tabs = ["General", "Audio & Equalizer", "Library & Sources", "Karaoke & Lyrics", "Legal"] as const;
+  let tab = $state<(typeof tabs)[number]>("General");
 </script>
 
 <div class="wrap">
@@ -16,7 +16,20 @@
     {/each}
   </div>
   <div class="pane">
-    {#if tab === "Audio & Equalizer"}
+    {#if tab === "General"}
+      <div class="card">
+        <h3>Connection mode</h3>
+        <div class="seg big" role="group" aria-label="Connection mode">
+          <button class:on={!store.s?.grid_down} onclick={() => settingsActions.setGridDown(false)}>Online</button>
+          <button class:on={store.s?.grid_down} onclick={() => settingsActions.setGridDown(true)}>Grid-Down</button>
+        </div>
+        <p class="note">
+          <b>Online:</b> radio streams, podcast feeds and downloads are available.<br />
+          <b>Grid-Down:</b> the app uses no network at all. It hides anything that needs the internet and shows only
+          what is on your drives and in your downloads. It also saves power. Switching never stops what is playing.
+        </p>
+      </div>
+    {:else if tab === "Audio & Equalizer"}
       <Equalizer />
     {:else if tab === "Library & Sources"}
       <Sources />
@@ -45,5 +58,8 @@
   .subbtn.on{background:#1FA8FF18;color:var(--lblue)}
   .pane{flex:1;min-width:0}
   .row{display:flex;gap:8px;align-items:center;font-size:14px;margin:10px 0}
-  .note{font-size:12px;color:var(--muted);margin:0}
+  .note{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.6}
+  .seg{display:flex;border:1px solid #2A3747;border-radius:12px;overflow:hidden;margin-top:10px;width:320px}
+  .seg button{flex:1;height:44px;border:0;background:transparent;color:var(--silver);font-size:15px}
+  .seg button.on{background:#1FA8FF18;color:var(--lblue);font-weight:600}
 </style>

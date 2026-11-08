@@ -37,7 +37,13 @@
 {/if}
 
 <div class="shell">
-  <header><img src="/logo.png" alt="Cindrix Radio" height="36" /></header>
+  <header>
+    <img src="/logo.png" alt="Cindrix Radio" height="36" />
+    <button class="mode" class:grid={store.s?.grid_down} onclick={() => settingsActions.setGridDown(!store.s?.grid_down)}
+      title="Switch between Online and Grid-Down mode" aria-label="Connection mode: {store.s?.grid_down ? 'Grid-Down' : 'Online'}. Click to switch.">
+      <span class="d"></span>{store.s?.grid_down ? "Grid-Down" : "Online"}
+    </button>
+  </header>
   <nav>
     {#each nav as n}
       <button class="navbtn" class:on={active === n} onclick={() => (active = n)}>{n}</button>
@@ -125,6 +131,11 @@
   .shell{display:grid;grid-template-columns:232px 1fr;grid-template-rows:60px 1fr 84px;height:100%}
   header{grid-column:1/3;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line)}
   header img{mix-blend-mode:screen}
+  header{justify-content:space-between}
+  .mode{height:32px;padding:0 14px;border-radius:16px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:12px;display:flex;align-items:center;gap:8px}
+  .mode .d{width:8px;height:8px;border-radius:4px;background:var(--green)}
+  .mode.grid{border-color:var(--blue);color:var(--lblue);background:#1FA8FF14}
+  .mode.grid .d{background:var(--blue)}
   nav{padding:16px 12px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line)}
   .navbtn{height:40px;text-align:left;padding:0 14px;border-radius:10px;border:0;background:transparent;color:var(--silver)}
   .navbtn.on{background:#1FA8FF18;color:var(--lblue)}
