@@ -1,0 +1,140 @@
+//! Global 10-band graphic EQ (RBJ peaking biquads) with preamp and bypass.
+//! Bands: 31/62/125/250/500 Hz and 1/2/4/8/16 kHz, +/-12 dB.
+use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
+
+pub const BANDS_HZ: [f32; 10] = [31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0];
+pub const MAX_DB: f32 = 12.0;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct EqSettings {
+    pub bypass: bool,
+    pub preamp_db: f32,
+    pub gains_db: [f32; 10],
+}
+
+impl Default for EqSettings {
+    fn default() -> Self { EqSettings { bypass: false, preamp_db: 0.0, gains_db: [0.0; 10] } }
+}
+
+impl EqSettings {
+    pub fn clamped(mut self) -> Self {
+        self.preamp_db = self.preamp_db.clamp(-MAX_DB, MAX_DB);
+        for g in self.gains_db.iter_mut() { *g = g.clamp(-MAX_DB, MAX_DB); }
+        self
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct Biquad { b0: f32, b1: f32, b2: f32, a1: f32, a2: f32, z1: f32, z2: f32 }
+
+impl Biquad {
+    fn peaking(sample_rate: f32, freq: f32, gain_db: f32, q: f32) -> Self {
+        let a = 10f32.powf(gain_db / 40.0);
+        let w0 = 2.0 * PI * (freq.min(sample_rate * 0.45)) / sample_rate;
+        let alpha = w0.sin() / (2.0 * q);
+        let cos = w0.cos();
+        let a0 = 1.0 + alpha / a;
+        Biquad {
+            b0: (1.0 + alpha * a) / a0,
+            b1: (-2.0 * cos) / a0,
+            b2: (1.0 - alpha * a) / a0,
+            a1: (-2.0 * cos) / a0,
+            a2: (1.0 - alpha / a) / a0,
+            ..Default::default()
+        }
+    }
+    #[inline]
+    fn run(&mut self, x: f32) -> f32 {
+        let y = self.b0 * x + self.z1;
+        self.z1 = self.b1 * x - self.a1 * y + self.z2;
+        self.z2 = self.b2 * x - self.a2 * y;
+        y
+    }
+}
+
+pub struct Equalizer {
+    sample_rate: f32,
+    channels: usize,
+    settings: EqSettings,
+    filters: Vec<[Biquad; 10]>, // one chain per channel
+    preamp: f32,
+}
+
+impl Equalizer {
+    pub fn new(sample_rate: u32, channels: usize, settings: EqSettings) -> Self {
+        let mut e = Equalizer { sample_rate: sample_rate as f32, channels, settings: EqSettings::default(), filters: vec![], preamp: 1.0 };
+        e.set(settings);
+        e
+    }
+
+    pub fn set(&mut self, settings: EqSettings) {
+        let s = settings.clamped();
+        let chain: [Biquad; 10] = std::array::from_fn(|i| Biquad::peaking(self.sample_rate, BANDS_HZ[i], s.gains_db[i], 1.414));
+        self.filters = vec![chain; self.channels];
+        self.preamp = 10f32.powf(s.preamp_db / 20.0);
+        self.settings = s;
+    }
+
+    /// Process interleaved samples in place.
+    pub fn process(&mut self, buf: &mut [f32]) {
+        if self.settings.bypass { return; }
+        for frame in buf.chunks_mut(self.channels) {
+            for (ch, x) in frame.iter_mut().enumerate() {
+                let mut v = *x * self.preamp;
+                for f in self.filters[ch].iter_mut() { v = f.run(v); }
+                *x = v.clamp(-1.0, 1.0);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sine(freq: f32, sr: u32, n: usize) -> Vec<f32> {
+        (0..n).map(|i| 0.1 * (2.0 * PI * freq * i as f32 / sr as f32).sin()).collect()
+    }
+    fn peak(v: &[f32]) -> f32 { v[v.len() / 2..].iter().fold(0.0, |m, x| m.max(x.abs())) }
+
+    #[test]
+    fn flat_eq_is_transparent() {
+        let mut e = Equalizer::new(44100, 1, EqSettings::default());
+        let mut b = sine(1000.0, 44100, 8000);
+        let orig = b.clone();
+        e.process(&mut b);
+        assert!((peak(&b) - peak(&orig)).abs() < 0.001);
+    }
+
+    #[test]
+    fn plus_12db_at_1k_boosts_about_4x() {
+        let mut s = EqSettings::default();
+        s.gains_db[5] = 12.0;
+        let mut e = Equalizer::new(44100, 1, s);
+        let mut b = sine(1000.0, 44100, 16000);
+        let before = peak(&b);
+        e.process(&mut b);
+        let ratio = peak(&b) / before;
+        assert!(ratio > 3.5 && ratio < 4.5, "ratio {ratio}");
+    }
+
+    #[test]
+    fn bypass_leaves_audio_untouched() {
+        let mut s = EqSettings::default();
+        s.gains_db = [12.0; 10];
+        s.bypass = true;
+        let mut e = Equalizer::new(44100, 2, s);
+        let mut b = sine(500.0, 44100, 4000);
+        let orig = b.clone();
+        e.process(&mut b);
+        assert_eq!(b, orig);
+    }
+
+    #[test]
+    fn gains_are_clamped_to_12db() {
+        let mut s = EqSettings::default();
+        s.gains_db[0] = 99.0;
+        assert_eq!(s.clamped().gains_db[0], 12.0);
+    }
+}

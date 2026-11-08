@@ -41,3 +41,7 @@ Karaoke toggle opens the mixer/lyrics experience without changing the ordinary l
 - Low-end device timeout offers safe fallback; playback engine remains responsive.
 - Original mode sounds unchanged; Near-Remove warns of artifacts and limits.
 - EQ and karaoke faders remain operable offline and with Bluetooth output.
+
+
+## Android full-screen karaoke view (2026-11-08)
+Starting a karaoke song on Android opens a full-screen view showing only the lyrics area (user-supplied lyrics when the lyrics setting is on, otherwise the Cindrix Radio banner), the vocal remover/reducer controls, and the standard playback controls. When the song finishes or is stopped, the view returns to song selection. Collapsing the view keeps audio playing. Details in 009 section 11.
