@@ -8,6 +8,7 @@ export const store = $state<{ s: Settings | null }>({ s: null });
 export const settingsActions = {
   load: async () => { store.s = await api.settings(); },
   setLyrics: async (on: boolean) => { store.s = await api.setLyricsViewer(on); },
+  setGridDown: async (on: boolean) => { store.s = await api.setGridDown(on); },
   accept: async () => { store.s = await api.acceptTerms(TERMS_VERSION); },
   setEq: async (eq: EqSettings) => { store.s = await api.setEq(eq); },
 };

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { api, type Feed, type Episode } from "./api";
   import { actions } from "./player.svelte";
+  import { store } from "./settings.svelte";
 
   let feeds = $state<Feed[]>([]);
   let openId = $state<string | null>(null);
@@ -9,6 +10,10 @@
   let busy = $state<string | null>(null);
   let message = $state<string | null>(null);
 
+  const gridDown = $derived(store.s?.grid_down ?? false);
+  // Grid-Down shows only podcasts with downloaded episodes, and only those episodes
+  const shown = $derived(gridDown ? feeds.filter((f) => f.episodes.some((e) => e.file)) : feeds);
+  const episodesOf = (f: Feed) => (gridDown ? f.episodes.filter((e) => e.file) : f.episodes);
   const open = $derived(feeds.find((f) => f.id === openId) ?? null);
 
   onMount(async () => { feeds = await api.podcastList(); });
@@ -57,7 +62,10 @@
 </script>
 
 {#if !open}
-  <div class="bar">
+  {#if gridDown}
+    <p class="note">Grid-Down mode: showing downloaded episodes only. Nothing is using the network.</p>
+  {/if}
+  <div class="bar" class:hide={gridDown}>
     <input class="field" placeholder="Paste a podcast RSS link (https://…)" bind:value={url} onkeydown={(e) => e.key === "Enter" && url.trim() && add()} />
     <button class="btn primary" disabled={!url.trim() || !!busy} onclick={add}>Add feed</button>
     <label class="btn file">Import OPML<input type="file" accept=".opml,.xml,text/xml" onchange={importOpml} hidden /></label>
@@ -70,11 +78,11 @@
     <div class="card empty">No podcasts yet. Paste an RSS link above, or import an OPML file from another podcast app.</div>
   {:else}
     <div class="grid">
-      {#each feeds as f (f.id)}
+      {#each shown as f (f.id)}
         <button class="feed card" onclick={() => (openId = f.id)}>
           {#if f.image}<img src={f.image} alt="" />{:else}<div class="ph">{f.title.slice(0, 2).toUpperCase()}</div>{/if}
           <b>{f.title}</b>
-          <span>{f.episodes.length} episodes · {unplayed(f)} unplayed</span>
+          <span>{episodesOf(f).length} episodes · {episodesOf(f).filter((e) => !e.played).length} unplayed</span>
         </button>
       {/each}
     </div>
@@ -89,11 +97,11 @@
   {#if busy}<p class="status">{busy}</p>{/if}
   {#if message}<p class="status err">{message}</p>{/if}
   <div class="eps">
-    {#each open.episodes as e (e.guid)}
+    {#each episodesOf(open) as e (e.guid)}
       <div class="ep" class:done={e.played}>
         <button class="play" disabled={!e.file} title={e.file ? "Play" : "Download to play"} aria-label="Play {e.title}" onclick={() => play(open, e)}>▶</button>
         <div class="meta"><b>{e.title}</b><span>{e.published ?? ""} {fmt(e.duration_secs)}</span></div>
-        {#if e.file}<span class="tag">Downloaded</span>{:else}<button class="btn" disabled={!!busy} onclick={() => download(open, e)}>Download</button>{/if}
+        {#if e.file}<span class="tag">Downloaded</span>{:else}<button class="btn" hidden={gridDown} disabled={!!busy} onclick={() => download(open, e)}>Download</button>{/if}
         <button class="btn" onclick={() => togglePlayed(open, e)}>{e.played ? "Mark unplayed" : "Mark played"}</button>
       </div>
     {/each}
@@ -103,6 +111,7 @@
 <style>
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .bar h3{flex:1}
+  .hide{display:none}
   .field{flex:1;min-width:240px;height:36px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
   .file{display:inline-flex;align-items:center;cursor:pointer}
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}

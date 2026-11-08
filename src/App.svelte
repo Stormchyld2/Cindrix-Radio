@@ -82,7 +82,7 @@
               <div class="drive"><span class="dot" class:off={!d.online}></span><b>{d.name}</b><span>{d.count}</span></div>
             {/each}
           </div>
-          <div class="btns"><button class="btn primary" onclick={() => (active = "Library")}>Open Library</button><button class="btn">Manage</button></div>
+          <div class="btns"><button class="btn primary" onclick={() => (active = "Library")}>Open Library</button><button class="btn" onclick={() => (active = "Settings")}>Manage</button></div>
         </div>
         <div class="card fixed" style="height:292px">
           <h3>Up Next</h3>
@@ -93,6 +93,14 @@
               <span class="muted">Queue is empty.</span>
             {/each}
           </div>
+        </div>
+        <div class="card fixed" style="height:112px">
+          <h3>Connectivity</h3>
+          <div class="seg" role="group" aria-label="Connection mode">
+            <button class:on={!store.s?.grid_down} onclick={() => settingsActions.setGridDown(false)}>Online</button>
+            <button class:on={store.s?.grid_down} onclick={() => settingsActions.setGridDown(true)}>Grid-Down</button>
+          </div>
+          <span class="muted">{store.s?.grid_down ? "Local and downloaded content only. No network use." : "Streams, feeds and downloads available."}</span>
         </div>
       </aside>
     </div>
@@ -137,6 +145,9 @@
   .meta{display:flex;flex-direction:column;font-size:13px}.meta span,.time,.muted{color:var(--muted);font-size:12px}
   .time{margin-left:auto}
   .note{font-size:13px;color:var(--muted)}
+  .seg{display:flex;border:1px solid #2A3747;border-radius:10px;overflow:hidden}
+  .seg button{flex:1;height:32px;border:0;background:transparent;color:var(--silver);font-size:13px}
+  .seg button.on{background:#1FA8FF18;color:var(--lblue)}
   .head{display:flex;justify-content:space-between;align-items:center}
   .err{color:var(--red);font-size:12px;margin:8px 0 0}
   footer{grid-column:1/3;display:flex;align-items:center;gap:20px;padding:0 20px;border-top:1px solid var(--line);background:var(--panel)}

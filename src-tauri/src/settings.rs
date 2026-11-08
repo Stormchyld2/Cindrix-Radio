@@ -11,11 +11,13 @@ pub struct Settings {
     /// Version of the legal documents the user accepted; None until accepted.
     pub terms_version: Option<String>,
     pub eq: EqSettings,
+    /// Grid-Down mode: no network use at all, only local and downloaded content. Default: Online.
+    pub grid_down: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { lyrics_viewer: false, terms_version: None, eq: EqSettings::default() }
+        Settings { lyrics_viewer: false, terms_version: None, eq: EqSettings::default(), grid_down: false }
     }
 }
 
@@ -46,6 +48,11 @@ mod tests {
     }
 
     #[test]
+    fn starts_in_online_mode() {
+        assert!(!Settings::default().grid_down);
+    }
+
+    #[test]
     fn terms_not_accepted_by_default() {
         assert!(Settings::default().terms_version.is_none());
     }
@@ -58,6 +65,7 @@ mod tests {
         s.lyrics_viewer = true;
         s.terms_version = Some("1.0".into());
         s.eq.gains_db[3] = 4.5;
+        s.grid_down = true;
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);
         let _ = std::fs::remove_dir_all(dir);

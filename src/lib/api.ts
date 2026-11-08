@@ -6,13 +6,13 @@ export interface PlayerState { current: Track | null; queue: Track[]; playing: b
 export interface Folders { root: string; radio: string; music: string; podcasts: string; audiobooks: string; videos: string; recordings: string }
 
 export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[] }
-export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings }
+export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings; grid_down: boolean }
 
 export interface Episode { guid: string; title: string; enclosure_url: string; published: string | null; duration_secs: number | null; file: string | null; played: boolean }
 export interface Feed { id: string; url: string; title: string; image: string | null; episodes: Episode[] }
 export interface ImportResult { feeds: Feed[]; failed: string[] }
 
-export interface LibItem { id: string; source_id: string; path: string; kind: Kind; title: string; artist: string; album: string; genre: string | null; folder_genre: string | null; group: string; duration_secs: number | null; available: boolean }
+export interface LibItem { id: string; source_id: string; path: string; kind: Kind; title: string; artist: string; album: string; genre: string | null; folder_genre: string | null; group: string; duration_secs: number | null; published?: string | null; description?: string | null; available: boolean }
 export interface Source { id: string; path: string; kinds: Kind[] }
 export interface SourceStatus { source: Source; online: boolean; items: number }
 export interface ScanSummary { scanned: number; added: number; skipped_offline: string[] }
@@ -26,7 +26,7 @@ let mock: PlayerState = { current: null, queue: [], playing: false, position_sec
 const call = async <T>(cmd: string, args: Record<string, unknown> = {}, fb: () => T): Promise<T> =>
   inTauri ? invoke<T>(cmd, args) : fb();
 
-let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0) } };
+let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_down: false, eq: { bypass: false, preamp_db: 0, gains_db: Array(10).fill(0) } };
 
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
@@ -49,6 +49,7 @@ export const api = {
   podcastMarkPlayed: (feedId: string, guid: string, played: boolean) => call<Feed[]>("podcast_mark_played", { feedId, guid, played }, desktopOnly),
   settings: () => call<Settings>("get_settings", {}, () => mockSettings),
   setLyricsViewer: (on: boolean) => call<Settings>("set_lyrics_viewer", { on }, () => (mockSettings = { ...mockSettings, lyrics_viewer: on })),
+  setGridDown: (on: boolean) => call<Settings>("set_grid_down", { on }, () => (mockSettings = { ...mockSettings, grid_down: on })),
   acceptTerms: (version: string) => call<Settings>("accept_terms", { version }, () => (mockSettings = { ...mockSettings, terms_version: version })),
   setEq: (eq: EqSettings) => call<Settings>("set_eq", { eq }, () => (mockSettings = { ...mockSettings, eq })),
   folders: () => call<Folders>("get_folders", {}, () => ({ root: "Downloads/Cindrix", radio: "Downloads/Cindrix/Radio", music: "Downloads/Cindrix/Music", podcasts: "Downloads/Cindrix/Podcasts", audiobooks: "Downloads/Cindrix/Audiobooks", videos: "Downloads/Cindrix/Videos", recordings: "Downloads/Cindrix/Radio" })),

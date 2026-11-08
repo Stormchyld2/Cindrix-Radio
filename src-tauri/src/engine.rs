@@ -72,13 +72,18 @@ impl<S: Source<Item = f32>> Iterator for EqSource<S> {
 }
 
 impl<S: Source<Item = f32>> Source for EqSource<S> {
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        self.frame.clear();
+        self.pos = 0;
+        self.inner.try_seek(pos)
+    }
     fn current_frame_len(&self) -> Option<usize> { None }
     fn channels(&self) -> u16 { self.inner.channels() }
     fn sample_rate(&self) -> u32 { self.inner.sample_rate() }
     fn total_duration(&self) -> Option<Duration> { self.inner.total_duration() }
 }
 
-enum Cmd { Play(String), Pause, Resume, Stop, Volume(f32) }
+enum Cmd { Play(String), Pause, Resume, Stop, Volume(f32), Seek(u32) }
 
 #[derive(Clone, Default)]
 pub struct Status {
@@ -138,6 +143,7 @@ impl Engine {
                     Ok(Cmd::Resume) => sink.play(),
                     Ok(Cmd::Stop) => { sink.stop(); playing = false; }
                     Ok(Cmd::Volume(v)) => sink.set_volume(v),
+                    Ok(Cmd::Seek(secs)) => { let _ = sink.try_seek(Duration::from_secs(secs as u64)); }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
@@ -157,6 +163,7 @@ impl Engine {
     pub fn resume(&self) { self.send(Cmd::Resume) }
     pub fn stop(&self) { self.send(Cmd::Stop) }
     pub fn set_volume(&self, v: f32) { self.send(Cmd::Volume(v)) }
+    pub fn seek(&self, secs: u32) { self.send(Cmd::Seek(secs)) }
     pub fn set_eq(&self, s: EqSettings) { self.eq.set(s) }
     pub fn status(&self) -> Status { self.status.lock().unwrap().clone() }
     pub fn take_ended(&self) -> bool { self.ended.swap(false, Ordering::SeqCst) }
@@ -172,6 +179,27 @@ mod tests {
         EqSource::new(src, shared.clone()).take(n).collect()
     }
     fn peak(v: &[f32]) -> f32 { v[v.len() / 2..].iter().fold(0.0, |m, x| m.max(x.abs())) }
+
+    struct Probe { seeks: Arc<Mutex<Vec<Duration>>>, n: usize }
+    impl Iterator for Probe {
+        type Item = f32;
+        fn next(&mut self) -> Option<f32> { if self.n == 0 { None } else { self.n -= 1; Some(0.0) } }
+    }
+    impl Source for Probe {
+        fn current_frame_len(&self) -> Option<usize> { None }
+        fn channels(&self) -> u16 { 1 }
+        fn sample_rate(&self) -> u32 { 44100 }
+        fn total_duration(&self) -> Option<Duration> { None }
+        fn try_seek(&mut self, p: Duration) -> Result<(), rodio::source::SeekError> { self.seeks.lock().unwrap().push(p); Ok(()) }
+    }
+
+    #[test]
+    fn eq_source_forwards_seeks() {
+        let seeks = Arc::new(Mutex::new(Vec::new()));
+        let mut e = EqSource::new(Probe { seeks: seeks.clone(), n: 1000 }, SharedEq::new(EqSettings::default()));
+        e.try_seek(Duration::from_secs(5)).unwrap();
+        assert_eq!(*seeks.lock().unwrap(), vec![Duration::from_secs(5)]);
+    }
 
     #[test]
     fn eq_source_flat_is_transparent() {

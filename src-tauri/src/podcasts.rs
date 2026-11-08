@@ -219,6 +219,8 @@ pub fn download_episode(root: &Path, feed: &Feed, ep: &Episode) -> Result<PathBu
         if n != written { let _ = std::fs::remove_file(&part); return Err("Download was cut short; try again".into()); }
     }
     std::fs::rename(&part, &dest).map_err(|e| e.to_string())?;
+    // keep the folder self-describing for other devices; failure here must not fail the download
+    let _ = crate::meta::append_entry(&dir, &name, &ep.title, ep.published.as_deref().and_then(crate::meta::iso_date).as_deref(), None);
     Ok(dest)
 }
 

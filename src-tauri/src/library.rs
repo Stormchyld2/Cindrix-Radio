@@ -35,6 +35,11 @@ pub struct Item {
     /// Parent folder name: the book for audiobooks, the show for podcasts.
     pub group: String,
     pub duration_secs: Option<u32>,
+    /// From the folder's metadata.txt, when present.
+    #[serde(default)]
+    pub published: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
     #[serde(default)]
     pub available: bool,
 }
@@ -116,6 +121,7 @@ fn scan_source(src: &Source) -> Vec<Item> {
     let mut files = Vec::new();
     walk(root, 0, &mut files);
     let mut items = Vec::new();
+    let mut meta_cache: std::collections::HashMap<PathBuf, std::collections::HashMap<String, crate::meta::Meta>> = std::collections::HashMap::new();
     for f in files {
         let Some(kind) = classify(&f, root, &src.kinds) else { continue };
         let tags = if kind == Kind::Video { Tags::default() } else { read_tags(&f) };
@@ -126,18 +132,25 @@ fn scan_source(src: &Source) -> Vec<Item> {
         let folder_genre = if comps.len() >= 3 { Some(comps[0].clone()) } else { None };
         let group = f.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let path = f.to_string_lossy().to_string();
+        let dir = f.parent().unwrap_or(root).to_path_buf();
+        let meta = meta_cache.entry(dir.clone()).or_insert_with(|| crate::meta::load_dir(&dir));
+        let fname = f.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        let m = meta.get(&fname).cloned().unwrap_or_default();
         items.push(Item {
             id: format!("{:016x}", fnv(&path)),
             source_id: src.id.clone(),
             path,
             kind,
-            title: tags.title.unwrap_or(stem),
+            // metadata.txt first, then embedded tags, then the file name
+            title: m.title.or(tags.title).unwrap_or(stem),
             artist: tags.artist.unwrap_or_default(),
             album: tags.album.unwrap_or_default(),
             genre: tags.genre,
             folder_genre,
             group,
             duration_secs: tags.secs,
+            published: m.date,
+            description: m.description,
             available: true,
         });
     }
@@ -158,6 +171,8 @@ impl LibraryStore {
         let tmp = self.path.with_extension("json.tmp");
         if std::fs::write(&tmp, serde_json::to_string(d).unwrap()).is_ok() { let _ = std::fs::rename(tmp, &self.path); }
     }
+
+    pub fn source_list(&self) -> Vec<Source> { self.data.lock().unwrap().sources.clone() }
 
     pub fn statuses(&self) -> Vec<SourceStatus> {
         let d = self.data.lock().unwrap();
@@ -303,6 +318,25 @@ mod tests {
         assert_eq!(store.search("", None, Some("Country"), 10, 0).total, 1);
         let c = store.counts();
         assert_eq!((c.music, c.video), (2, 1));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn metadata_txt_overrides_titles() {
+        let root = temp("meta");
+        touch(&root.join("Podcasts/Show/ep1.mp3"));
+        touch(&root.join("Podcasts/Show/ep2.mp3"));
+        fs::write(root.join("Podcasts/Show/metadata.txt"), "EP1.mp3|Clean Title|2026-11-08|About it").unwrap();
+        let store = LibraryStore::load(root.join("idx.json"));
+        store.add_source(root.to_str().unwrap(), vec![Kind::Podcast]).unwrap();
+        store.scan(None);
+        let all = store.search("", None, None, 10, 0);
+        let one = all.items.iter().find(|i| i.path.ends_with("ep1.mp3")).unwrap();
+        assert_eq!(one.title, "Clean Title");
+        assert_eq!(one.published.as_deref(), Some("2026-11-08"));
+        assert_eq!(one.description.as_deref(), Some("About it"));
+        let two = all.items.iter().find(|i| i.path.ends_with("ep2.mp3")).unwrap();
+        assert_eq!(two.title, "ep2", "no entry: falls back to the file name");
         let _ = fs::remove_dir_all(root);
     }
 
