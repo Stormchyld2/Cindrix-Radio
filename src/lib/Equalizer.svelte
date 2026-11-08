@@ -35,14 +35,14 @@
     <div class="bands">
       <div class="band">
         <span class="db">{eq.preamp_db > 0 ? "+" : ""}{eq.preamp_db}</span>
-        <input type="range" min="-12" max="12" step="0.5" value={eq.preamp_db} orient="vertical"
+        <input type="range" min="-12" max="12" step="0.5" value={eq.preamp_db}
           aria-label="Preamp" oninput={(e) => push({ preamp_db: +e.currentTarget.value })} />
         <span class="hz">Pre</span>
       </div>
       {#each labels as l, i}
         <div class="band">
           <span class="db">{eq.gains_db[i] > 0 ? "+" : ""}{eq.gains_db[i]}</span>
-          <input type="range" min="-12" max="12" step="0.5" value={eq.gains_db[i]} orient="vertical"
+          <input type="range" min="-12" max="12" step="0.5" value={eq.gains_db[i]}
             aria-label="{l} Hz" oninput={(e) => setBand(i, +e.currentTarget.value)} />
           <span class="hz">{l}</span>
         </div>
