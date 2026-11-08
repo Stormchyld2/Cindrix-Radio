@@ -3,7 +3,7 @@
 ## Terms of Use / EULA (required)
 Because users can add their own text (lyrics) and import their own media and stream URLs, the app includes Terms of Use inside the app and on any download page.
 
-- Shown on first run; the user must accept to continue. Reachable any time at Settings → About → Terms of Use.
+- Shown on first run; the user must accept to continue. Reachable any time at **Settings → Legal**, a separate subtab holding the EULA, Terms of Service and Privacy Policy (see 010, subtab 17).
 - Shown again, briefly, the first time the lyrics viewer is switched on.
 - Must state: the user is **solely responsible** for all content they import, add, paste, record or stream; Cindrix Radio **does not condone, facilitate or encourage copyright infringement**; the app ships with no lyrics and no licensed content; stream recording is only for content the user is permitted to record; the user must follow the laws where they live.
 - Draft text: `docs/legal/TERMS-DRAFT.md`. **Draft only. A qualified IP lawyer must review it before any public release.**

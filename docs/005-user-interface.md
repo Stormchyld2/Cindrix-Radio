@@ -32,9 +32,9 @@ Large controls and uncluttered pages, route status and safe playback/queue contr
 
 ## Settings organization
 
-**Settings is one primary application tab containing 16 subtabs**, fully specified in [010 — Settings Architecture](010-settings-architecture.md). General opens by default. The subtabs, in order, are General; Appearance; Playback; Audio & Equalizer; Devices & Bluetooth; Music Library; Podcasts; Internet Radio; Audiobooks; Karaoke & Lyrics; LAN & Sharing; Downloads & Storage; Privacy & Security; Backup & Restore; Advanced & Diagnostics; About.
+**Settings is one primary application tab containing 17 subtabs**, fully specified in [010 — Settings Architecture](010-settings-architecture.md). General opens by default. The subtabs, in order, are General; Appearance; Playback; Audio & Equalizer; Devices & Bluetooth; Music Library; Podcasts; Internet Radio; Audiobooks; Karaoke & Lyrics; LAN & Sharing; Downloads & Storage; Privacy & Security; Backup & Restore; Advanced & Diagnostics; About; Legal.
 
-Show four non-clickable grouping headings inside Settings navigation: Application (1–5), Media & Libraries (6–10), Connectivity & Data (11–14), System (15–16). Windows uses secondary settings navigation within the content pane; Android uses a compact touch-friendly internal list/selector after entering Settings from the main hamburger drawer. Neither layout adds a third navigation level.
+Show four non-clickable grouping headings inside Settings navigation: Application (1–5), Media & Libraries (6–10), Connectivity & Data (11–14), System (15–17). Windows uses secondary settings navigation within the content pane; Android uses a compact touch-friendly internal list/selector after entering Settings from the main hamburger drawer. Neither layout adds a third navigation level.
 
 Provide cross-subtab settings search, stateful back navigation, category-scoped reset, platform capability labeling, and ordinary-setting autosave. Confirm file moves/deletions, sharing activation, settings restore and other destructive/sensitive actions. Retain the approved vertical scrolling **without visible scrollbars**. See 010 for each control, recommended default, data boundaries and acceptance criteria.
 

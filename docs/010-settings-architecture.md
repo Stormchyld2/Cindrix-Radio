@@ -7,7 +7,7 @@
 
 ## 1. Navigation and interaction contract
 
-**Settings is one top-level application tab, with exactly 16 child subtabs**, not 16 top-level app tabs. On Windows, the main sidebar remains available and Settings contains a secondary list of subtabs in its content pane. On Android, Settings is entered through the application hamburger drawer; settings subtabs use a compact, touch-friendly internal list or selector that does not permanently consume a wide content column. General is the default subtab. Organizing headings are non-navigable: Application (1–5), Media & Libraries (6–10), Connectivity & Data (11–14), System (15–16). Avoid a third navigational hierarchy.
+**Settings is one top-level application tab, with exactly 17 child subtabs**, not 17 top-level app tabs. On Windows, the main sidebar remains available and Settings contains a secondary list of subtabs in its content pane. On Android, Settings is entered through the application hamburger drawer; settings subtabs use a compact, touch-friendly internal list or selector that does not permanently consume a wide content column. General is the default subtab. Organizing headings are non-navigable: Application (1–5), Media & Libraries (6–10), Connectivity & Data (11–14), System (15–17). Avoid a third navigational hierarchy.
 
 The Settings search at top searches labels, descriptions and related keywords across all subtabs; results navigate to the relevant control with accessible focus. All content scrolls vertically with mouse wheel/trackpad, touch, keyboard and assistive technology but **no visible scrollbar tracks/thumbs**. Avoid horizontal page scrolling, and preserve subtab and scroll position when returning. Use spacious layouts, consistent charcoal/metallic silver/electric blue, text labels rather than icon-only ambiguity, and accessible controls.
 
@@ -225,6 +225,13 @@ Disabling UI controls must be backed by true backend permission enforcement.
 - Copyright/credits, support/issue reporting and online-only Check for Updates.
 - Clear build status: planned/prototype/tested/released, never infer working capabilities from the documentation.
 
+### 17 — Legal
+- Separate subtab holding all legal documents, viewable in-app and offline: **End User License Agreement (EULA)**, **Terms of Service / Terms of Use**, **Privacy Policy**, plus third-party notices link (also in About).
+- Each document shows version and last-updated date; the app records which version the user accepted and when (stored locally) and asks again only when a new version changes terms.
+- States plainly: user is solely responsible for content they import or add; app does not condone or facilitate copyright infringement; user-added lyrics stay on the device.
+- Privacy Policy states: no account, no analytics or ads, no server hosting user content; what stays local (library index, lyrics, settings); what leaves the device only when the user uses it (radio directory lookups, stream playback, LAN sharing they enable).
+- Draft sources: `docs/legal/`. Drafts require lawyer review before release.
+
 ## 3. Persistence, validation and schema
 
 Use versioned local portable files (JSON/YAML as suitable), atomic writes with recoverable previous version, stable IDs for playlists/profiles, and disposable indexes. No authoritative SQL database for user state. Separate:
@@ -237,7 +244,7 @@ Every setting needs a stable key, type, validated bounds/choices, effective defa
 
 ## 4. Required acceptance tests
 
-1. Exactly 16 subtabs under one Settings main tab; grouping headers not additional routes; General opens by default.
+1. Exactly 17 subtabs under one Settings main tab; grouping headers not additional routes; General opens by default.
 2. Windows secondary navigation and Android touch-friendly subtab picker have complete parity, searchable labels and accessible focus.
 3. Hidden visual scrollbars do not disable mouse wheel, touch, keyboard, screen readers, or scroll-position restoration.
 4. Each settings type validates input and persists across clean restart; corrupted config loads a safe recoverable version rather than silently losing data.
