@@ -153,7 +153,8 @@ Music queues and audiobook progress remain independent.
 | Default audio treatment | **LOCKED:** Original; user opt-in Reduce / Attempt Removal |
 | Processing preference | Balanced default; Fast / Best Available, limited by device resource checks |
 | Reduction strength | Adjustable **only when the selected algorithm makes strength meaningful**; vocal-stem fader only for actual separated stems |
-| Lyrics sources | Embedded / sidecar / manually supplied; optional lawful online lookup |
+| Show lyrics viewer | **On/Off, default Off.** Off hides the lyrics window and shows a Cindrix Radio banner in its place. On shows only user-pasted or user-supplied lyrics; no lyrics ship with the app and no online lookup exists. |
+| Lyrics sources | User-pasted text, sidecar .lrc/.txt, embedded tags. Stored locally; never uploaded or shared over LAN. Manage/clear stored lyrics here |
 | Lyrics timing | **LOCKED:** plain manually scrollable text; no synchronization/timecodes required |
 | Lyrics appearance | 24px illustrative default, scalable with accessibility settings; high contrast available |
 | Full-screen lyrics | Optional; do not force on all music |

@@ -170,3 +170,4 @@ Approved by the product owner during UI mockup review; supersedes earlier wordin
 - **Downloads:** no dashboard card; lives in Settings → Downloads & Storage plus offline badges/filters.
 - **Saves:** default root is `Downloads/Cindrix/<Kind>` (Radio, Music, Podcasts, Videos). Radio favorites and recordings default to `Downloads/Cindrix/Radio`. The root and each kind can be changed.
 - **Radio directory:** Radio Browser plus manual stream URLs and M3U/PLS import. SHOUTcast/iHeart directories are not used. Stream-rights documentation is required before store release.
+- **Lyrics:** no bundled lyrics, no online lookup. A Settings toggle (default Off) enables a lyrics viewer showing only text the user pasted or supplied; when Off the space shows a Cindrix Radio banner. See 006 and 010.
