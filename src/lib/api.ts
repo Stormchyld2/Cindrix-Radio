@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type Kind = "Music" | "Radio" | "Podcast" | "Audiobook" | "Video";
-export interface Track { id: string; title: string; subtitle: string; kind: Kind; duration_secs: number | null; path?: string | null }
-export interface PlayerState { current: Track | null; queue: Track[]; playing: boolean; position_secs: number; volume: number; error?: string | null }
+export interface Track { id: string; title: string; subtitle: string; kind: Kind; duration_secs: number | null; path?: string | null; url?: string | null }
+export interface PlayerState { current: Track | null; queue: Track[]; playing: boolean; position_secs: number; volume: number; error?: string | null; now_playing?: string | null; recording?: boolean; connecting?: boolean }
 export interface Folders { root: string; radio: string; music: string; podcasts: string; audiobooks: string; videos: string; recordings: string }
 
 export interface EqSettings { bypass: boolean; preamp_db: number; gains_db: number[] }
@@ -19,6 +19,10 @@ export interface ScanSummary { scanned: number; added: number; skipped_offline: 
 export interface Page { items: LibItem[]; total: number }
 export interface Counts { music: number; podcast: number; audiobook: number; video: number }
 
+export interface Station { id: string; name: string; url: string; favicon: string | null; tags: string | null; country: string | null; codec: string | null; bitrate: number | null; rb_uuid: string | null }
+export interface StreamInfo { url: string; name: string | null; genre: string | null; bitrate: number | null; content_type: string | null }
+export interface ImportStations { stations: Station[]; added: number }
+
 const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 // Browser fallback so the UI can be developed with plain `npm run dev`.
@@ -31,6 +35,14 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_d
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  radioStations: () => call<Station[]>("radio_stations", {}, () => []),
+  radioAdd: (station: Station) => call<Station[]>("radio_add", { station }, desktopOnly),
+  radioRemove: (id: string) => call<Station[]>("radio_remove", { id }, desktopOnly),
+  radioImport: (text: string) => call<ImportStations>("radio_import", { text }, desktopOnly),
+  radioProbe: (url: string) => call<StreamInfo>("radio_probe", { url }, desktopOnly),
+  radioSearch: (query: string, tag: string | null, limit: number, offset: number) => call<Station[]>("radio_search", { query, tag, limit, offset }, () => []),
+  radioPlay: (station: Station) => call<PlayerState>("radio_play", { station }, desktopOnly),
+  radioRecord: (start: boolean, name: string) => call<string | null>("radio_record", { start, name }, desktopOnly),
   libSources: () => call<SourceStatus[]>("library_sources", {}, () => []),
   libAddSource: (path: string, kinds: Kind[]) => call<SourceStatus[]>("library_add_source", { path, kinds }, desktopOnly),
   libRemoveSource: (id: string) => call<SourceStatus[]>("library_remove_source", { id }, desktopOnly),

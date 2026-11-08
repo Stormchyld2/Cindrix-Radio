@@ -7,6 +7,7 @@
   import SettingsView from "./lib/SettingsView.svelte";
   import Podcasts from "./lib/Podcasts.svelte";
   import Library from "./lib/Library.svelte";
+  import Radio from "./lib/Radio.svelte";
   import TermsGate from "./lib/TermsGate.svelte";
   import { store, settingsActions, TERMS_VERSION } from "./lib/settings.svelte";
 
@@ -54,6 +55,10 @@
     <h1>{active}</h1>
     {#if active === "Settings"}
       <SettingsView />
+    {:else if active === "Radio"}
+      <Radio go={(t) => (active = t)} />
+    {:else if active === "Playlists" || active === "Favorites"}
+      <div class="card note">{active} are coming in a later update.</div>
     {:else if active === "Library"}
       <Library />
     {:else if active === "Podcasts"}
