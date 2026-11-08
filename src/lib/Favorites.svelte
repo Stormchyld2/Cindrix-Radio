@@ -4,7 +4,6 @@
   import { actions } from "./player.svelte";
   import { lists, listActions, playList, startTrack, episodes, loadEpisodes, downloadEpisode } from "./playlistStore.svelte";
   import { store } from "./settings.svelte";
-  import { store } from "./settings.svelte";
 
   let stations = $state<Station[]>([]);
   let message = $state<string | null>(null);
