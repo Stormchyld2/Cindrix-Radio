@@ -230,7 +230,7 @@ Disabling UI controls must be backed by true backend permission enforcement.
 - Each document shows version and last-updated date; the app records which version the user accepted and when (stored locally) and asks again only when a new version changes terms.
 - States plainly: user is solely responsible for content they import or add; app does not condone or facilitate copyright infringement; user-added lyrics stay on the device.
 - Privacy Policy states: no account, no analytics or ads, no server hosting user content; what stays local (library index, lyrics, settings); what leaves the device only when the user uses it (radio directory lookups, stream playback, LAN sharing they enable).
-- Draft sources: `docs/legal/`. Drafts require lawyer review before release.
+- Source texts: `docs/legal/`. AI-drafted; require lawyer review before release.
 
 ## 3. Persistence, validation and schema
 

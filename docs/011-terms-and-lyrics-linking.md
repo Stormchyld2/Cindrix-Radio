@@ -6,7 +6,7 @@ Because users can add their own text (lyrics) and import their own media and str
 - Shown on first run; the user must accept to continue. Reachable any time at **Settings → Legal**, a separate subtab holding the EULA, Terms of Service and Privacy Policy (see 010, subtab 17).
 - Shown again, briefly, the first time the lyrics viewer is switched on.
 - Must state: the user is **solely responsible** for all content they import, add, paste, record or stream; Cindrix Radio **does not condone, facilitate or encourage copyright infringement**; the app ships with no lyrics and no licensed content; stream recording is only for content the user is permitted to record; the user must follow the laws where they live.
-- Draft text: `docs/legal/TERMS-DRAFT.md`. **Draft only. A qualified IP lawyer must review it before any public release.**
+- Texts: `docs/legal/EULA.md`, `TERMS-OF-SERVICE.md`, `PRIVACY-POLICY.md` (see `docs/legal/README.md`). **Draft only. A qualified IP lawyer must review it before any public release.**
 
 ## Local storage only
 User-added lyrics are stored only on the device (local database or app-data file). They are never uploaded, synced to a server we control, included in LAN Share, or included in backup exports unless the user explicitly includes them in a local backup file. The app has no server that hosts user content.
