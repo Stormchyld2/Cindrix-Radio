@@ -9,6 +9,7 @@ pub struct Folders {
     pub radio: String,
     pub music: String,
     pub podcasts: String,
+    pub audiobooks: String,
     pub videos: String,
     pub recordings: String,
 }
@@ -28,13 +29,14 @@ pub fn default_folders() -> Folders {
         radio: p("Radio"),
         music: p("Music"),
         podcasts: p("Podcasts"),
+        audiobooks: p("Audiobooks"),
         videos: p("Videos"),
         recordings: p("Radio"), // recordings default beside favorites, per user
     }
 }
 
 pub fn ensure(f: &Folders) -> std::io::Result<()> {
-    for d in [&f.root, &f.radio, &f.music, &f.podcasts, &f.videos, &f.recordings] {
+    for d in [&f.root, &f.radio, &f.music, &f.podcasts, &f.audiobooks, &f.videos, &f.recordings] {
         std::fs::create_dir_all(d)?;
     }
     Ok(())
@@ -49,5 +51,7 @@ mod tests {
         assert!(f.radio.ends_with("Radio"));
         assert!(f.radio.contains("Cindrix"));
         assert_eq!(f.recordings, f.radio);
+        assert!(f.audiobooks.ends_with("Audiobooks"));
+        assert!(f.podcasts.ends_with("Podcasts"));
     }
 }
