@@ -29,7 +29,10 @@ pub struct VideoSource { pub id: &'static str, pub label: &'static str, pub can_
 pub fn sources() -> Vec<VideoSource> {
     let mut v = Vec::new();
     #[cfg(feature = "ytdl")]
-    v.push(VideoSource { id: "youtube", label: "YouTube", can_download: true });
+    {
+        v.push(VideoSource { id: "youtube", label: "YouTube", can_download: true });
+        v.push(VideoSource { id: "web", label: "Any website (paste a link)", can_download: true });
+    }
     #[cfg(not(feature = "ytdl"))]
     v.push(VideoSource { id: "youtube", label: "YouTube (watch only)", can_download: false });
     v.push(VideoSource { id: "archive", label: "Internet Archive", can_download: true });
@@ -77,6 +80,10 @@ pub fn search(data_dir: &Path, source: &str, query: &str, limit: u32, offset: u3
         "archive" => search_archive(q, limit, offset),
         "peertube" => search_peertube(q, limit, offset),
         "youtube" => youtube_search(data_dir, q, limit, offset),
+        "web" => {
+            if !is_http(q) { return Err("Paste the link to the page that has the video.".into()); }
+            youtube_search(data_dir, q, limit, offset)
+        }
         _ => Err("Unknown video source".into()),
     }
 }
@@ -221,7 +228,7 @@ pub fn download(data_dir: &Path, hit: &VideoHit, videos_root: &Path) -> Result<P
             let file = pick_peertube_file(&get_json(api)?).ok_or("This video has no downloadable file")?;
             save_stream(&file, &dir, &hit.title)
         }
-        "youtube" => youtube_download(data_dir, hit, &dir),
+        "youtube" | "web" => youtube_download(data_dir, hit, &dir),
         _ => Err("Unknown video source".into()),
     }
 }
@@ -256,6 +263,32 @@ pub mod ytdl {
     use super::*;
     use std::process::Command;
 
+    /// yt-dlp.exe compiled into the private Windows build (empty when not embedded).
+    static EMBEDDED: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/yt-dlp.bin"));
+
+    fn fingerprint() -> String {
+        let head = &EMBEDDED[..EMBEDDED.len().min(65536)];
+        let h = head.iter().fold(0xcbf29ce484222325u64, |h, b| (h ^ *b as u64).wrapping_mul(0x100000001b3));
+        format!("{}-{:016x}", EMBEDDED.len(), h)
+    }
+
+    /// Put the embedded helper in the app data folder the first time, and again when a new
+    /// app build ships a different one. A newer helper the user fetched with Update is kept
+    /// until then.
+    fn unpack_embedded(data_dir: &Path) {
+        if !cfg!(windows) || EMBEDDED.len() < 1_000_000 { return; }
+        let dir = data_dir.join("bin");
+        let (exe, stamp) = (dir.join(exe_name()), dir.join("yt-dlp.embedded"));
+        let fp = fingerprint();
+        if exe.exists() && std::fs::read_to_string(&stamp).map_or(false, |s| s == fp) { return; }
+        if std::fs::create_dir_all(&dir).is_err() { return; }
+        let part = dir.join(format!("{}.part", exe_name()));
+        if std::fs::write(&part, EMBEDDED).is_ok() {
+            let _ = std::fs::remove_file(&exe);
+            if std::fs::rename(&part, &exe).is_ok() { let _ = std::fs::write(&stamp, fp); }
+        }
+    }
+
     fn exe_name() -> &'static str { if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" } }
 
     fn run(bin: &Path, args: &[&str]) -> Result<String, String> {
@@ -273,6 +306,7 @@ pub mod ytdl {
 
     /// The yt-dlp we manage in the app data folder, else one on the PATH.
     pub fn binary(data_dir: &Path) -> Option<PathBuf> {
+        unpack_embedded(data_dir);
         let own = data_dir.join("bin").join(exe_name());
         if own.exists() { return Some(own); }
         let on_path = PathBuf::from(exe_name());
@@ -303,20 +337,45 @@ pub mod ytdl {
         run(&dest, &["--version"]).map(|v| v.trim().to_string())
     }
 
+    fn is_youtube(d: &Value, page: &str) -> bool {
+        ["ie_key", "extractor_key"].iter().any(|k| text(&d[*k]).eq_ignore_ascii_case("youtube"))
+            || reqwest::Url::parse(page).ok().and_then(|u| u.host_str().map(|h| h.ends_with("youtube.com") || h == "youtu.be")).unwrap_or(false)
+    }
+
     pub fn parse_search(v: &Value) -> Vec<VideoHit> {
         let one = |d: &Value| -> Option<VideoHit> {
+            let page = [text(&d["webpage_url"]), text(&d["url"])].into_iter().find(|u| is_http(u)).unwrap_or_default();
             let id = text(&d["id"]);
-            if !safe_id(&id) { return None; }
-            let who = text(&d["channel"]);
+            let who = [text(&d["channel"]), text(&d["uploader"])].into_iter().find(|s| !s.is_empty());
+            let duration_secs = d["duration"].as_f64().map(|s| s as u64);
+            if is_youtube(d, &page) {
+                if !safe_id(&id) { return None; }
+                return Some(VideoHit {
+                    title: text(&d["title"]),
+                    channel: who.unwrap_or_default(),
+                    duration_secs,
+                    thumbnail: Some(format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg")),
+                    page_url: format!("https://www.youtube.com/watch?v={id}"),
+                    embed_url: Some(format!("https://www.youtube.com/embed/{id}")),
+                    source: "youtube".into(),
+                    id,
+                });
+            }
+            // any other site: keep the page address the extractor gave us
+            if page.is_empty() { return None; }
+            let host = reqwest::Url::parse(&page).ok().and_then(|u| u.host_str().map(|h| h.trim_start_matches("www.").to_string())).unwrap_or_default();
+            let thumb = Some(text(&d["thumbnail"])).filter(|t| is_http(t))
+                .or_else(|| d["thumbnails"].as_array().and_then(|a| a.iter().rev().map(|t| text(&t["url"])).find(|u| is_http(u))));
+            let title = text(&d["title"]);
             Some(VideoHit {
-                title: text(&d["title"]),
-                channel: if who.is_empty() { text(&d["uploader"]) } else { who },
-                duration_secs: d["duration"].as_f64().map(|s| s as u64),
-                thumbnail: Some(format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg")),
-                page_url: format!("https://www.youtube.com/watch?v={id}"),
-                embed_url: Some(format!("https://www.youtube.com/embed/{id}")),
-                source: "youtube".into(),
-                id,
+                id: if safe_id(&id) { id } else { format!("{:016x}", page.bytes().fold(0xcbf29ce484222325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3))) },
+                source: "web".into(),
+                title: if title.is_empty() { page.clone() } else { title },
+                channel: who.unwrap_or(host),
+                duration_secs,
+                thumbnail: thumb,
+                page_url: page,
+                embed_url: None,
             })
         };
         match v["entries"].as_array() {
@@ -340,10 +399,12 @@ pub mod ytdl {
     }
 
     pub fn download(data_dir: &Path, hit: &VideoHit, dir: &Path) -> Result<PathBuf, String> {
-        if !safe_id(&hit.id) { return Err("Bad video id".into()); }
+        let url = if hit.source == "youtube" {
+            if !safe_id(&hit.id) { return Err("Bad video id".into()); }
+            format!("https://www.youtube.com/watch?v={}", hit.id)
+        } else if is_http(&hit.page_url) { hit.page_url.clone() } else { return Err("Bad video address".into()); };
         let bin = binary(data_dir).ok_or("The YouTube helper (yt-dlp) is not installed yet. Install it from the Videos tab.")?;
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let url = format!("https://www.youtube.com/watch?v={}", hit.id);
         let out = run(&bin, &[
             "-f", "b[ext=mp4]/b", "--no-playlist", "--no-warnings", "--windows-filenames", "--no-mtime", "-q",
             "--no-simulate", "--print", "after_move:filepath",
@@ -425,17 +486,26 @@ mod tests {
     fn source_list_always_has_the_open_sources() {
         let ids: Vec<_> = sources().iter().map(|s| s.id).collect();
         assert!(ids.contains(&"archive") && ids.contains(&"peertube") && ids.contains(&"youtube"));
+        #[cfg(feature = "ytdl")]
+        assert!(ids.contains(&"web"));
+        #[cfg(not(feature = "ytdl"))]
+        assert!(!ids.contains(&"web"));
     }
 
     #[cfg(feature = "ytdl")]
     #[test]
     fn youtube_results_and_single_links_are_read() {
-        let list = json!({"entries":[{"id":"dQw4w9WgXcQ","title":"T","channel":"C","duration":212.0},{"id":"bad id!"}]});
+        let list = json!({"entries":[{"id":"dQw4w9WgXcQ","ie_key":"Youtube","title":"T","channel":"C","duration":212.0},{"id":"bad id!","ie_key":"Youtube"}]});
         let hits = ytdl::parse_search(&list);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].duration_secs, Some(212));
         assert_eq!(hits[0].embed_url.as_deref(), Some("https://www.youtube.com/embed/dQw4w9WgXcQ"));
-        let single = json!({"id":"abc","title":"One","uploader":"U"});
+        let single = json!({"id":"abc","extractor_key":"Youtube","title":"One","uploader":"U"});
         assert_eq!(ytdl::parse_search(&single)[0].channel, "U");
+        let other = json!({"id":"x1","extractor_key":"Vimeo","title":"W","uploader":"Up","webpage_url":"https://vimeo.com/1","thumbnail":"https://t/x.jpg","duration":10});
+        let h = &ytdl::parse_search(&other)[0];
+        assert_eq!((h.source.as_str(), h.page_url.as_str(), h.embed_url.clone()), ("web", "https://vimeo.com/1", None));
+        let no_page = json!({"entries":[{"id":"zzz","title":"no link"}]});
+        assert!(ytdl::parse_search(&no_page).is_empty(), "entries without an address are skipped");
     }
 }

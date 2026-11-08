@@ -18,7 +18,7 @@
 
   const gridDown = $derived(store.s?.grid_down ?? false);
   const cur = $derived(sources.find((s) => s.id === source));
-  const needsHelper = $derived(source === "youtube" && cur?.can_download && !ytdl);
+  const needsHelper = $derived((source === "youtube" || source === "web") && cur?.can_download && !ytdl);
 
   async function refreshMine() {
     const p = await api.libSearch("", "Video", null, null, null, 200, 0);
@@ -44,8 +44,8 @@
     if (r) { results = r; if (!r.length) message = "Nothing found. Try other words."; }
   }
   async function installHelper() {
-    const v = await run("Downloading the YouTube helper…", () => api.ytdlInstall());
-    if (v) { ytdl = v; message = `YouTube helper ready (${v}).`; }
+    const v = await run("Downloading the helper…", () => api.ytdlInstall());
+    if (v) { ytdl = v; message = `Helper ready (${v}).`; }
   }
   async function download(h: VideoHit) {
     const k = `${h.source}:${h.id}`;
@@ -72,14 +72,14 @@
 {:else}
   <div class="bar">
     <select class="sel" aria-label="Where to search" bind:value={source}>{#each sources as s}<option value={s.id}>{s.label}</option>{/each}</select>
-    <input class="search" placeholder={source === "youtube" ? "Search YouTube or paste a video link…" : "Search videos…"} bind:value={query} onkeydown={(e) => e.key === "Enter" && search()} />
+    <input class="search" placeholder={source === "youtube" ? "Search YouTube or paste a video link…" : source === "web" ? "Paste a link to any page with a video…" : "Search videos…"} bind:value={query} onkeydown={(e) => e.key === "Enter" && search()} />
     <button class="btn primary" disabled={!!busy || !query.trim() || needsHelper} onclick={search}>Search</button>
   </div>
   {#if needsHelper}
-    <div class="card gd">YouTube search and download use a free helper program (yt-dlp), which is not installed yet.
-      <button class="btn primary" disabled={!!busy} onclick={installHelper}>Install YouTube helper</button></div>
-  {:else if source === "youtube" && ytdl}
-    <p class="note">YouTube helper {ytdl}. <button class="link" disabled={!!busy} onclick={installHelper}>Update</button> if downloads stop working.</p>
+    <div class="card gd">This source uses a free helper program (yt-dlp), which is not installed yet.
+      <button class="btn primary" disabled={!!busy} onclick={installHelper}>Install helper</button></div>
+  {:else if (source === "youtube" || source === "web") && ytdl}
+    <p class="note">Downloader helper {ytdl}. <button class="link" disabled={!!busy} onclick={installHelper}>Update</button> if downloads stop working.</p>
   {/if}
   {#if busy}<p class="status">{busy}</p>{/if}
   {#if message}<p class="status" class:err={/not|could|fail|bad|unavailable|nothing/i.test(message)}>{message}</p>{/if}
@@ -89,7 +89,7 @@
       {#each results as h (h.source + h.id)}
         {@const k = `${h.source}:${h.id}`}
         <div class="vc">
-          <button class="thumb" aria-label="Watch {h.title}" onclick={() => watch(h)}>
+          <button class="thumb" disabled={!h.embed_url} aria-label="Watch {h.title}" onclick={() => watch(h)}>
             {#if h.thumbnail}<img src={h.thumbnail} alt="" loading="lazy" />{/if}
             {#if h.duration_secs}<span class="dur">{fmt(h.duration_secs)}</span>{/if}
           </button>

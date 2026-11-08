@@ -24,6 +24,12 @@ jobs:
         with: { workspaces: src-tauri }
       - run: npm install
       - run: npx tauri icon public/logo.png
+      - name: Fetch yt-dlp to embed in the private build
+        shell: bash
+        run: |
+          mkdir -p src-tauri/ytdlp
+          curl -L --fail -o src-tauri/ytdlp/yt-dlp.exe https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe
+          test "$(wc -c < src-tauri/ytdlp/yt-dlp.exe)" -gt 1000000
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       # production configuration: the YouTube helper must compile out cleanly
       - run: cargo check --manifest-path src-tauri/Cargo.toml --no-default-features
