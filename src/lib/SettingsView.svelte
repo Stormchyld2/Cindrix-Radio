@@ -1,10 +1,11 @@
 <script lang="ts">
   import Equalizer from "./Equalizer.svelte";
   import Legal from "./Legal.svelte";
+  import Sources from "./Sources.svelte";
   import { store, settingsActions } from "./settings.svelte";
 
   // Subtabs are added here as each is built; the full list is in docs/010.
-  const tabs = ["Audio & Equalizer", "Karaoke & Lyrics", "Legal"] as const;
+  const tabs = ["Audio & Equalizer", "Library & Sources", "Karaoke & Lyrics", "Legal"] as const;
   let tab = $state<(typeof tabs)[number]>("Audio & Equalizer");
 </script>
 
@@ -17,6 +18,8 @@
   <div class="pane">
     {#if tab === "Audio & Equalizer"}
       <Equalizer />
+    {:else if tab === "Library & Sources"}
+      <Sources />
     {:else if tab === "Karaoke & Lyrics"}
       <div class="card">
         <h3>Lyrics</h3>

@@ -1,5 +1,6 @@
 mod dsp;
 mod engine;
+mod library;
 mod paths;
 mod podcasts;
 mod player;
@@ -8,6 +9,8 @@ mod settings;
 use player::{Player, PlayerState, Track};
 use std::sync::Mutex;
 use engine::Engine;
+use library::{Counts, LibraryStore, Page, ScanSummary, SourceStatus};
+use player::Kind;
 use podcasts::{Feed, PodStore};
 use serde::Serialize;
 use tauri::State;
@@ -196,6 +199,44 @@ fn podcast_mark_played(store: State<PodStore>, feed_id: String, guid: String, pl
     g.clone()
 }
 
+#[tauri::command]
+fn library_sources(lib: State<LibraryStore>) -> Vec<SourceStatus> { lib.statuses() }
+
+#[tauri::command]
+fn library_add_source(lib: State<LibraryStore>, path: String, kinds: Vec<Kind>) -> Result<Vec<SourceStatus>, String> {
+    lib.add_source(&path, kinds)?;
+    Ok(lib.statuses())
+}
+
+#[tauri::command]
+fn library_remove_source(lib: State<LibraryStore>, id: String) -> Vec<SourceStatus> {
+    lib.remove_source(&id); // files are never touched
+    lib.statuses()
+}
+
+#[tauri::command]
+fn library_set_kinds(lib: State<LibraryStore>, id: String, kinds: Vec<Kind>) -> Result<Vec<SourceStatus>, String> {
+    lib.set_kinds(&id, kinds)?;
+    Ok(lib.statuses())
+}
+
+#[tauri::command]
+async fn library_scan(lib: State<'_, LibraryStore>, id: Option<String>) -> Result<ScanSummary, String> {
+    let lib = lib.inner().clone();
+    blocking(move || Ok(lib.scan(id.as_deref()))).await
+}
+
+#[tauri::command]
+fn library_search(lib: State<LibraryStore>, query: String, kind: Option<Kind>, genre: Option<String>, limit: usize, offset: usize) -> Page {
+    lib.search(&query, kind, genre.as_deref(), limit.min(2000), offset)
+}
+
+#[tauri::command]
+fn library_genres(lib: State<LibraryStore>, kind: Option<Kind>) -> Vec<(String, usize)> { lib.genres(kind) }
+
+#[tauri::command]
+fn library_counts(lib: State<LibraryStore>) -> Counts { lib.counts() }
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -207,6 +248,7 @@ pub fn run() {
             let path = dir.join("settings.json");
             let loaded = settings::Settings::load(&path);
             app.manage(Engine::start(loaded.eq.clone(), 0.8));
+            app.manage(LibraryStore::load(dir.join("library.json")));
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             Ok(())
@@ -216,7 +258,9 @@ pub fn run() {
             player_next, player_enqueue, player_volume,
             get_settings, set_lyrics_viewer, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
-            podcast_download, podcast_mark_played
+            podcast_download, podcast_mark_played,
+            library_sources, library_add_source, library_remove_source, library_set_kinds,
+            library_scan, library_search, library_genres, library_counts
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");

@@ -12,6 +12,13 @@ export interface Episode { guid: string; title: string; enclosure_url: string; p
 export interface Feed { id: string; url: string; title: string; image: string | null; episodes: Episode[] }
 export interface ImportResult { feeds: Feed[]; failed: string[] }
 
+export interface LibItem { id: string; source_id: string; path: string; kind: Kind; title: string; artist: string; album: string; genre: string | null; folder_genre: string | null; group: string; duration_secs: number | null; available: boolean }
+export interface Source { id: string; path: string; kinds: Kind[] }
+export interface SourceStatus { source: Source; online: boolean; items: number }
+export interface ScanSummary { scanned: number; added: number; skipped_offline: string[] }
+export interface Page { items: LibItem[]; total: number }
+export interface Counts { music: number; podcast: number; audiobook: number; video: number }
+
 const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 // Browser fallback so the UI can be developed with plain `npm run dev`.
@@ -24,6 +31,15 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, eq: { 
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  libSources: () => call<SourceStatus[]>("library_sources", {}, () => []),
+  libAddSource: (path: string, kinds: Kind[]) => call<SourceStatus[]>("library_add_source", { path, kinds }, desktopOnly),
+  libRemoveSource: (id: string) => call<SourceStatus[]>("library_remove_source", { id }, desktopOnly),
+  libSetKinds: (id: string, kinds: Kind[]) => call<SourceStatus[]>("library_set_kinds", { id, kinds }, desktopOnly),
+  libScan: (id: string | null) => call<ScanSummary>("library_scan", { id }, desktopOnly),
+  libSearch: (query: string, kind: Kind | null, genre: string | null, limit: number, offset: number) =>
+    call<Page>("library_search", { query, kind, genre, limit, offset }, () => ({ items: [], total: 0 })),
+  libGenres: (kind: Kind | null) => call<[string, number][]>("library_genres", { kind }, () => []),
+  libCounts: () => call<Counts>("library_counts", {}, () => ({ music: 0, podcast: 0, audiobook: 0, video: 0 })),
   podcastList: () => call<Feed[]>("podcast_list", {}, () => []),
   podcastAdd: (url: string) => call<Feed[]>("podcast_add", { url }, desktopOnly),
   podcastImportOpml: (xml: string) => call<ImportResult>("podcast_import_opml", { xml }, desktopOnly),
