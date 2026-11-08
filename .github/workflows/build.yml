@@ -64,12 +64,30 @@ jobs:
       - run: npx tauri android init --ci
       - name: Add permissions, playback service and storage access
         run: python3 android/patch.py
-      - name: Build debug APK (arm64)
-        run: npx tauri android build --apk --debug --target aarch64 --ci
+      - name: Build release APK (arm64)
+        run: npx tauri android build --apk --target aarch64 --ci
+      - name: Sign with the Cindrix key (so each build installs over the last one)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -e
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/cindrix.keystore"
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*unsigned*.apk' | head -1)
+          echo "unsigned: $APK"
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p dist-android
+          "$BT/zipalign" -p -f 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/cindrix.keystore" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KEY_PASS --out dist-android/Cindrix-Radio.apk "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --print-certs dist-android/Cindrix-Radio.apk | head -3
+          rm -f "$RUNNER_TEMP/cindrix.keystore"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Cindrix-Radio-android-debug-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: Cindrix-Radio-android-apk
+          path: dist-android/Cindrix-Radio.apk
           if-no-files-found: error
           retention-days: 30

@@ -24,4 +24,10 @@ t = g.read_text()
 t = re.sub(r"^android \{", "android {\n    packaging { jniLibs { useLegacyPackaging = true } }", t, count=1, flags=re.M)
 t += '\ndependencies {\n    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")\n}\n'
 g.write_text(t)
+
+# keep the classes Rust calls by name (JNI) and the yt-dlp library from being stripped in release builds
+pg = next(pathlib.Path("src-tauri/gen/android/app").glob("proguard-rules.pro"), None)
+rules = "\n-keep class app.cindrix.radio.** { *; }\n-keep class com.yausername.** { *; }\n-keep class com.fasterxml.** { *; }\n-dontwarn **\n"
+if pg is not None: pg.write_text(pg.read_text() + rules)
+else: pathlib.Path("src-tauri/gen/android/app/proguard-rules.pro").write_text(rules)
 print(man.read_text()); print(t)
