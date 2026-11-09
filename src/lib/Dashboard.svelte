@@ -79,7 +79,6 @@
   <h3><span class="ph"><Icon name="sliders" size={16} /></span>Quick Tools</h3>
   <div class="tools">
     <button onclick={() => go("Settings", "Audio & Equalizer")}><Icon name="sliders" size={34} />Equalizer</button>
-    <button onclick={() => go("Karaoke")}><Icon name="karaoke" size={34} />Karaoke</button>
 {#if !store.s?.grid_down}    <button onclick={() => go("Radio")}><span class="redot"><Icon name="rec" size={34} /></span>Record</button>{/if}
     <button onclick={() => go("Settings", "LAN & Sharing")}><Icon name="share" size={34} />AirLink</button>
   </div>

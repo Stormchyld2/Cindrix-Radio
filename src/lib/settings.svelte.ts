@@ -10,7 +10,6 @@ export const settingsActions = {
   setLyrics: async (on: boolean) => { store.s = await api.setLyricsViewer(on); },
   setGridDown: async (on: boolean) => { store.s = await api.setGridDown(on); },
   accept: async () => { store.s = await api.acceptTerms(TERMS_VERSION); },
-  setVocal: async (amount: number) => { store.s = await api.setVocalReduction(amount); },
   setPrefs: async (patch: Partial<Prefs>) => { if (store.s) store.s = await api.setPrefs({ ...store.s.prefs, ...patch }); },
   setPauseOnDisconnect: async (on: boolean) => { store.s = await api.setPauseOnDisconnect(on); },
   setDownloadRoot: async (path: string | null) => { store.s = await api.setDownloadRoot(path); },

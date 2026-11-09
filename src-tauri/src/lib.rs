@@ -229,13 +229,6 @@ fn set_eq(s: State<AppSettings>, e: State<Engine>, eq: dsp::EqSettings) -> setti
     s.update(|g| g.eq = eq.clamped())
 }
 
-#[tauri::command]
-fn set_vocal_reduction(s: State<AppSettings>, e: State<Engine>, amount: f32) -> settings::Settings {
-    let out = s.update(|g| { g.eq.vocal_reduction = amount; g.eq = g.eq.clone().clamped(); });
-    e.set_eq(out.eq.clone());
-    out
-}
-
 fn lyrics_on(s: &AppSettings) -> Result<(), String> {
     if s.inner.lock().unwrap().lyrics_viewer { Ok(()) } else { Err("Turn on the lyrics viewer in Settings first.".into()) }
 }
@@ -566,7 +559,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_folders, player_state, player_play, player_toggle,
             player_next, player_enqueue, player_volume, player_seek,
-            get_settings, set_vocal_reduction, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
+            get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
             podcast_download, podcast_mark_played,
             library_sources, library_add_source, library_remove_source, library_set_kinds,

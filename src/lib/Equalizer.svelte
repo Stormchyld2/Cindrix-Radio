@@ -26,7 +26,7 @@
       <h3>Equalizer <span class="badge">Global</span></h3>
       <label class="bypass"><input type="checkbox" checked={eq.bypass} onchange={(e) => push({ bypass: e.currentTarget.checked })} /> Bypass</label>
     </div>
-    <p class="note">One setting for everything: Music, Radio, Podcasts, Audiobooks. Karaoke uses its own faders.</p>
+    <p class="note">One setting for everything: Music, Radio, Podcasts, Audiobooks.</p>
     <div class="presets">
       {#each Object.entries(presets) as [name, gains]}
         <button class="btn" onclick={() => push({ gains_db: gains })}>{name}</button>

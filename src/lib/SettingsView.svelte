@@ -19,7 +19,7 @@
 
   // Subtabs are added here as each is built; the full list is in docs/010.
   const tabs = ["General", "Appearance", "Playback", "Audio & Equalizer", "Devices & Bluetooth", "Library & Sources", "Podcasts", "Internet Radio", "Audiobooks",
-    "Karaoke & Lyrics", "LAN & Sharing", "Downloads & Storage", "Privacy & Security", "Backup & Restore", "Advanced & Diagnostics", "About", "Legal"] as const;
+    "LAN & Sharing", "Downloads & Storage", "Privacy & Security", "Backup & Restore", "Advanced & Diagnostics", "About", "Legal"] as const;
   let tab = $state<(typeof tabs)[number]>("General");
   // Home shortcuts can open a particular page
   $effect(() => { const t = ui.settingsTab; if (t && (tabs as readonly string[]).includes(t)) { tab = t as (typeof tabs)[number]; ui.settingsTab = null; } });
@@ -73,18 +73,6 @@
       <Equalizer />
     {:else if tab === "Library & Sources"}
       <Sources />
-    {:else if tab === "Karaoke & Lyrics"}
-      <div class="card">
-        <h3>Lyrics</h3>
-        <label class="row">
-          <input type="checkbox" checked={store.s?.lyrics_viewer ?? false} onchange={(e) => settingsActions.setLyrics(e.currentTarget.checked)} />
-          Show lyrics viewer (My lyrics, added by you)
-        </label>
-        <p class="note">
-          Off by default. Cindrix Radio ships with no lyrics and looks none up online. When on, you can paste lyrics
-          for a song; they are stored only on this device. You are responsible for any text you add.
-        </p>
-      </div>
     {:else}
       <Legal />
     {/if}

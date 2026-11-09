@@ -77,7 +77,6 @@ export const api = {
   playlistRemove: (id: string, index: number) => call<PlaylistData>("playlist_remove", { id, index }, desktopOnly),
   playlistShift: (id: string, index: number, delta: number) => call<PlaylistData>("playlist_shift", { id, index, delta }, desktopOnly),
   favoriteToggle: (track: Track) => call<PlaylistData>("favorite_toggle", { track }, desktopOnly),
-  setVocalReduction: (amount: number) => call<Settings>("set_vocal_reduction", { amount }, () => (mockSettings = { ...mockSettings, eq: { ...mockSettings.eq, vocal_reduction: amount } })),
   lyricsGet: (path: string) => call<string | null>("lyrics_get", { path }, () => null),
   lyricsSet: (path: string, title: string, text: string) => call<LyricsSummary[]>("lyrics_set", { path, title, text }, desktopOnly),
   lyricsList: () => call<LyricsSummary[]>("lyrics_list", {}, () => []),

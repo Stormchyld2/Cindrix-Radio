@@ -8,7 +8,7 @@
   <img src="/logo.png" alt="Cindrix Radio" height="48" />
   <h3>Cindrix Radio {d?.version ?? ""}</h3>
   <p class="note">By Cindrix Development · cindrixops@proton.me</p>
-  <p class="note">Music, radio, podcasts, audiobooks, videos and karaoke in one player that works with no internet. Your files stay where they are.</p>
+  <p class="note">Music, radio, podcasts, audiobooks, and videos in one player that works with no internet. Your files stay where they are.</p>
   <p class="note">Built with Tauri, Svelte, Rust, rodio and Symphonia. Radio listings come from the Radio Browser community directory. See the Legal tab for the terms and privacy notice.</p>
 </div>
 <style>

@@ -7,7 +7,6 @@
   import Library from "./lib/Library.svelte";
   import Radio from "./lib/Radio.svelte";
   import Videos from "./lib/Videos.svelte";
-  import Karaoke from "./lib/Karaoke.svelte";
   import Playlists from "./lib/Playlists.svelte";
   import Favorites from "./lib/Favorites.svelte";
   import VideoPlayer from "./lib/VideoPlayer.svelte";
@@ -69,7 +68,6 @@
     { id: "videos", label: "Videos", icon: "video", tab: "Videos", online: true },
     { id: "playlists", label: "Playlists", icon: "list", tab: "Playlists" },
     { id: "favorites", label: "Favorites", icon: "star", tab: "Favorites" },
-    { id: "karaoke", label: "Karaoke", icon: "karaoke", tab: "Karaoke" },
     { id: "tools", label: "Audio Tools", icon: "sliders", tab: "Settings", arg: "Audio & Equalizer" },
     { id: "airlink", label: "AirLink", icon: "share", tab: "Settings", arg: "LAN & Sharing" },
     { id: "car", label: "Car Mode", icon: "car", tab: "Dashboard", car: true },
@@ -134,8 +132,6 @@
       <SettingsView />
     {:else if active === "Radio"}
       <Radio go={(t) => navigate(t)} />
-    {:else if active === "Karaoke"}
-      <Karaoke />
     {:else if active === "Playlists"}
       <Playlists />
     {:else if active === "Favorites"}
