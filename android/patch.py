@@ -22,7 +22,7 @@ svc = '    <service android:name=".PlaybackService" android:exported="false" and
 s = s.replace("</application>", svc + "    </application>", 1)
 man.write_text(s)
 pkg = next(gen.glob("java/**/MainActivity.kt")).parent
-for f in ("MainActivity.kt", "GateActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt"):
+for f in ("MainActivity.kt", "GateActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt", "YtImpl.kt"):
     shutil.copy(pathlib.Path("android") / f, pkg / f)
 
 # C++ runtime for the audio library (cpal/oboe): link is added in build.rs, the library itself is packaged here
