@@ -66,10 +66,10 @@ jobs:
         run: python3 android/patch.py
       - name: Build release APK (arm64)
         run: |
-          # the Gradle download occasionally fails with a 504 from services.gradle.org: try up to 4 times
-          for i in 1 2 3 4; do
+          # the Gradle download occasionally fails with a 504 from services.gradle.org: try up to 7 times
+          for i in 1 2 3 4 5 6 7; do
             npx tauri android build --apk --target aarch64 --ci && exit 0
-            echo "build attempt $i failed; retrying in 30 s"; sleep 30
+            echo "build attempt $i failed; retrying in 45 s"; sleep 45
           done
           exit 1
       - name: Sign with the Cindrix key (so each build installs over the last one)
