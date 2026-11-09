@@ -1,156 +1,125 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import { isAndroid } from "./platform";
-  import { api, type Counts, type Folders, type LibItem, type SourceStatus, type Track } from "./api";
-  import { player, actions } from "./player.svelte";
+  import { api, type Counts, type SourceStatus, type Track } from "./api";
+  import { player } from "./player.svelte";
   import { store, settingsActions } from "./settings.svelte";
   import { startTrack } from "./playlistStore.svelte";
+  import { recent } from "./recent.svelte";
+  import Icon from "./Icon.svelte";
 
-  let { go }: { go: (tab: string) => void } = $props();
+  let { go }: { go: (tab: string, arg?: string) => void } = $props();
 
-  const inTauri = "__TAURI_INTERNALS__" in window;
-  let folders = $state<Folders | null>(null);
-  let sources = $state<SourceStatus[]>([]);
   let counts = $state<Counts>({ music: 0, podcast: 0, audiobook: 0, video: 0 });
-  let songs = $state<LibItem[]>([]);
+  let sources = $state<SourceStatus[]>([]);
+  let stations = $state(0);
   let message = $state<string | null>(null);
 
   onMount(async () => {
-    const [f, s, c, p] = await Promise.all([api.folders(), api.libSources(), api.libCounts(), api.libSearch("", "Music", null, null, null, 8, 0)]);
-    folders = f; sources = s; counts = c; songs = p.items.filter((i) => i.available);
+    const [c, s, st] = await Promise.all([api.libCounts(), api.libSources(), api.radioStations()]);
+    counts = c; sources = s; stations = st.length;
   });
 
-  async function playFile() {
-    const picked = await open({ multiple: false, filters: [{ name: "Audio", extensions: ["mp3", "flac", "ogg", "wav", "m4a", "aac", "opus"] }] });
-    if (typeof picked !== "string") return;
-    const name = picked.split(/[\\/]/).pop() ?? picked;
-    await run(() => actions.play({ id: picked, title: name.replace(/\.[^.]+$/, ""), subtitle: "Local file", kind: "Music", duration_secs: null, path: picked }));
-  }
-  async function run(job: () => Promise<unknown>) {
-    message = null;
-    try { await job(); } catch (e) { message = String(e instanceof Error ? e.message : e); }
-  }
-  const toTrack = (i: LibItem): Track => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
-  const fmt = (s: number | null) => (s == null ? "" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
-  const nice = (s: SourceStatus) => (s.source.builtin ? "Downloads/Cindrix" : s.source.path);
-  const tiles: { label: string; key: keyof Counts; tab: string }[] = [
-    { label: "Music", key: "music", tab: "Library" }, { label: "Podcasts", key: "podcast", tab: "Podcasts" },
-    { label: "Audiobooks", key: "audiobook", tab: "Library" }, { label: "Videos", key: "video", tab: "Videos" },
-  ];
-  const cur = $derived(player.s.current);
+  const downloads = $derived(sources.find((x) => x.source.id === "downloads")?.items ?? 0);
   const err = $derived(message ?? player.s.error ?? null);
+  const kindIcon = (t: Track) => (t.kind === "Radio" ? "radio" : t.kind === "Podcast" ? "podcast" : t.kind === "Audiobook" ? "book" : t.kind === "Video" ? "video" : "music");
+  const kindLabel = (t: Track) => (t.kind === "Music" ? "Song" : t.kind === "Radio" ? "Radio Station" : t.kind);
+  const pct = (pos: number, dur: number | null) => (dur ? Math.min(100, Math.round((pos / dur) * 100)) : 0);
+  async function resume(t: Track) {
+    message = null;
+    try { await startTrack(t); } catch (e) { message = String(e instanceof Error ? e.message : e); }
+  }
 </script>
 
-<div class="cols">
-  <section class="left">
-    <div class="tiles">
-      {#each tiles as t}
-        <button class="tile" onclick={() => go(t.tab)}><b>{counts[t.key].toLocaleString()}</b><span>{t.label}</span></button>
-      {/each}
-    </div>
+<section class="hero" aria-label="Cindrix Radio">
+  <svg class="mt" viewBox="0 0 800 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2a44" /><stop offset=".55" stop-color="#6d5a7a" /><stop offset="1" stop-color="#d98b5f" /></linearGradient>
+      <linearGradient id="fog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa9c4" stop-opacity=".0" /><stop offset="1" stop-color="#9aa9c4" stop-opacity=".45" /></linearGradient>
+    </defs>
+    <rect width="800" height="220" fill="url(#sky)" />
+    <path d="M0 150 L70 95 L120 125 L190 70 L260 130 L330 85 L400 135 L470 75 L540 130 L620 90 L700 135 L800 100 V220 H0Z" fill="#2c3550" />
+    <path d="M0 220 V170 L60 140 L130 170 L210 135 L300 175 L380 145 L470 180 L560 140 L650 175 L730 150 L800 170 V220Z" fill="#141c2c" />
+    <rect y="120" width="800" height="100" fill="url(#fog)" />
+    <path d="M0 220 V190 L25 160 L50 190 L80 150 L110 192 L140 165 L170 195 V220Z M630 220 V185 L660 150 L690 188 L720 155 L750 190 L780 160 L800 185 V220Z" fill="#0a1019" />
+  </svg>
+  <div class="over">
+    <img src="/logo.png" alt="Cindrix Radio" />
+    <p>MUSIC <i>•</i> RADIO <i>•</i> PODCASTS <i>•</i> AUDIOBOOKS <i>•</i> MORE</p>
+  </div>
+</section>
 
-    <div class="card">
-      <div class="head"><h3>Now playing</h3>{#if inTauri && !isAndroid}<button class="btn primary" onclick={playFile}>Play a file…</button>{/if}</div>
-      {#if cur}
-        <div class="np">
-          <b>{cur.title}</b>
-          <span>{cur.kind === "Radio" ? (player.s.connecting ? "Connecting…" : player.s.now_playing ?? cur.subtitle) : cur.subtitle}</span>
-          <div class="btns">
-            <button class="btn primary" onclick={actions.toggle}>{player.s.playing ? "Pause" : "Play"}</button>
-            <button class="btn" onclick={actions.next}>Next</button>
-            {#if cur.kind === "Music"}<button class="btn" onclick={() => go("Karaoke")}>Karaoke view</button>{/if}
-          </div>
-        </div>
-      {:else}
-        <p class="note">Nothing playing. Pick something below, or open Radio, Podcasts or Videos.</p>
-      {/if}
-      {#if err}<p class="err">{err}</p>{/if}
-    </div>
-
-    <div class="card">
-      <div class="head"><h3>From your library</h3><button class="btn" onclick={() => go("Library")}>Open Library</button></div>
-      <div class="rows">
-        {#each songs as i (i.id)}
-          <div class="row">
-            <button class="play" aria-label="Play {i.title}" onclick={() => run(async () => { await startTrack(toTrack(i)); })}>▶</button>
-            <div class="meta"><b>{i.title}</b><span>{[i.artist || i.group, i.album].filter(Boolean).join(" · ")}</span></div>
-            <span class="time">{fmt(i.duration_secs)}</span>
-            <button class="btn" onclick={() => run(() => actions.enqueue(toTrack(i)))}>+ Queue</button>
-          </div>
-        {:else}
-          <p class="note">No music yet. Songs you download land in Downloads/Cindrix automatically, or add a drive in Settings → Library &amp; Sources.</p>
-        {/each}
-      </div>
-    </div>
-
-    {#if folders}<div class="card note">Saves go to <code>{folders.root}</code> by default. Change any folder in Settings.</div>{/if}
-  </section>
-
-  <aside>
-    <div class="card fixed" style="height:246px">
-      <h3>Library Sources</h3>
-      <div class="list" style="height:120px">
-        {#each sources as s (s.source.id)}
-          <div class="drive"><span class="dot" class:off={!s.online}></span><b title={s.source.path}>{nice(s)}</b><span>{s.online ? `${s.items.toLocaleString()} items` : `${s.items.toLocaleString()} unavailable`}</span></div>
-        {:else}
-          <span class="muted">No sources yet.</span>
-        {/each}
-      </div>
-      <div class="btns"><button class="btn primary" onclick={() => go("Library")}>Open Library</button><button class="btn" onclick={() => go("Settings")}>Manage</button></div>
-    </div>
-    <div class="card fixed" style="height:292px">
-      <h3>Up Next</h3>
-      <div class="list" style="height:220px">
-        {#each player.s.queue as t}
-          <div class="drive"><b>{t.title}</b><span>{t.subtitle}</span></div>
-        {:else}
-          <span class="muted">Queue is empty.</span>
-        {/each}
-      </div>
-    </div>
-    <div class="card fixed" style="height:112px">
-      <h3>Connectivity</h3>
-      <div class="seg" role="group" aria-label="Connection mode">
-        <button class:on={!store.s?.grid_down} onclick={() => settingsActions.setGridDown(false)}>Online</button>
-        <button class:on={store.s?.grid_down} onclick={() => settingsActions.setGridDown(true)}>Grid-Down</button>
-      </div>
-      <span class="muted">{store.s?.grid_down ? "Local and downloaded content only. No network use." : "Streams, feeds and downloads available."}</span>
-    </div>
-  </aside>
+<div class="stats">
+  <button class="stat" onclick={() => go("Library", "Music")}><span class="ic"><Icon name="db" size={34} /></span><div><b>Library</b><span>{counts.music.toLocaleString()} Tracks</span></div></button>
+  <button class="stat" onclick={() => go("Radio")}><span class="ic"><Icon name="radio" size={34} /></span><div><b>Radio</b><span>{stations.toLocaleString()} Stations</span></div></button>
+  <button class="stat" onclick={() => go("Library", "Music")}><span class="ic"><Icon name="download" size={34} /></span><div><b>Downloads</b><span>{downloads.toLocaleString()} Items</span></div></button>
 </div>
 
+<section class="panel">
+  <h3><span class="ph"><Icon name="check" size={16} /></span>Continue Listening</h3>
+  {#if recent.items.length}
+    <div class="cards">
+      {#each recent.items.slice(0, 4) as r (r.track.id)}
+        <button class="card2" onclick={() => resume(r.track)}>
+          <span class="art k-{r.track.kind}"><Icon name={kindIcon(r.track)} size={54} /></span>
+          <span class="bar"><i style="width:{pct(r.pos, r.track.duration_secs)}%"></i></span>
+          <b>{r.track.title}</b>
+          <span class="sub">{r.track.kind === "Music" ? kindLabel(r.track) : kindLabel(r.track)}{r.track.subtitle ? ` • ${r.track.subtitle}` : ""}</span>
+        </button>
+      {/each}
+    </div>
+  {:else}
+    <p class="note">Nothing yet. Play a song, station, podcast or audiobook and it shows up here to pick up later.</p>
+  {/if}
+  {#if err}<p class="err">{err}</p>{/if}
+</section>
+
+<section class="panel">
+  <h3><span class="ph"><Icon name="sliders" size={16} /></span>Quick Tools</h3>
+  <div class="tools">
+    <button onclick={() => go("Settings", "Audio & Equalizer")}><Icon name="sliders" size={34} />Equalizer</button>
+    <button onclick={() => go("Karaoke")}><Icon name="karaoke" size={34} />Karaoke</button>
+    <button onclick={() => go("Radio")}><span class="redot"><Icon name="rec" size={34} /></span>Record</button>
+    <button onclick={() => go("Settings", "LAN & Sharing")}><Icon name="share" size={34} />AirLink</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h3><span class="ph"><Icon name="wifi" size={16} /></span>Connectivity</h3>
+  <div class="modes" role="group" aria-label="Connection mode">
+    <button class:on={!store.s?.grid_down} onclick={() => settingsActions.setGridDown(false)}><Icon name="wifi" size={26} />Online{#if !store.s?.grid_down}<span class="ck"><Icon name="check" size={20} /></span>{/if}</button>
+    <button class:on={store.s?.grid_down} onclick={() => settingsActions.setGridDown(true)}><Icon name="wifioff" size={26} />Grid-Down{#if store.s?.grid_down}<span class="ck"><Icon name="check" size={20} /></span>{/if}</button>
+  </div>
+  <p class="note">{store.s?.grid_down ? "Local and downloaded content only. No network use." : "Streams, feeds and downloads available."}</p>
+</section>
+
 <style>
-  .cols{display:flex;gap:20px;margin-top:16px}
-  .left{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
-  aside{width:340px;display:flex;flex-direction:column;gap:16px}
-  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--silver)}
-  .tile:hover{border-color:var(--blue)}
-  .tile b{font:700 26px Rajdhani,sans-serif}.tile span{font-size:12px;color:var(--muted)}
-  .fixed{flex:none;display:flex;flex-direction:column;gap:10px}
-  .list{overflow-y:auto;display:flex;flex-direction:column;gap:8px}
-  .drive{flex:none;display:flex;align-items:center;gap:8px;font-size:13px}
-  .drive b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .drive span:last-child{margin-left:auto;color:var(--muted);flex:none}
-  .dot{width:8px;height:8px;border-radius:4px;background:var(--green);flex:none}.dot.off{background:var(--muted)}
-  .btns{display:flex;gap:8px;margin-top:10px}.fixed .btns{margin-top:auto}
-  .rows{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-  .row{display:flex;align-items:center;gap:12px;height:52px}
-  .play{width:36px;height:36px;border-radius:18px;border:0;background:var(--blue);color:#04121C;flex:none}
-  .meta{display:flex;flex-direction:column;font-size:13px;min-width:0;flex:1}
-  .meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .meta span,.time,.muted{color:var(--muted);font-size:12px}
-  .np{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:14px}.np span{color:var(--muted);font-size:12px}
-  .note{font-size:13px;color:var(--muted)}
-  .seg{display:flex;border:1px solid #2A3747;border-radius:10px;overflow:hidden}
-  .seg button{flex:1;height:32px;border:0;background:transparent;color:var(--silver);font-size:13px}
-  .seg button.on{background:#1FA8FF18;color:var(--lblue)}
-  .head{display:flex;justify-content:space-between;align-items:center}
-  .err{color:var(--red);font-size:12px;margin:8px 0 0}
+  .hero{position:relative;height:clamp(190px,34vw,300px);border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+  .mt{position:absolute;inset:0;width:100%;height:100%}
+  .over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:radial-gradient(ellipse at center,#0006,#0000 70%)}
+  .over img{height:min(58%,170px);mix-blend-mode:screen;filter:drop-shadow(0 4px 16px #000a)}
+  .over p{margin:0;font-size:clamp(9px,1.5vw,13px);letter-spacing:.28em;color:#e6ebf3;text-shadow:0 1px 6px #000}.over i{font-style:normal;margin:0 .4em;color:#9fb0c7}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+  .stat{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--silver);text-align:left}
+  .stat .ic{color:var(--blue);flex:none}.stat div{display:flex;flex-direction:column;min-width:0}.stat b{font-size:17px;color:#F1F4F8}.stat div span{font-size:14px;color:var(--silver)}
+  .panel{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:14px 16px;margin-bottom:12px}
+  .panel h3{display:flex;align-items:center;gap:10px;font-size:20px;margin-bottom:12px}
+  .ph{color:var(--blue);display:inline-flex;width:26px;height:26px;border:2px solid var(--blue);border-radius:13px;align-items:center;justify-content:center}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .card2{display:flex;flex-direction:column;gap:4px;padding:0 0 10px;border-radius:14px;border:1px solid var(--line);background:#0D1620;color:var(--silver);text-align:left;overflow:hidden}
+  .card2 b{padding:0 10px;font-size:15px;color:#F1F4F8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{padding:0 10px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .art{height:96px;display:flex;align-items:center;justify-content:center;color:#fff}
+  .k-Music{background:linear-gradient(135deg,#0d2a5c,#1f6fd0)}.k-Podcast{background:linear-gradient(135deg,#2b1b66,#7a4fe0)}
+  .k-Audiobook{background:linear-gradient(135deg,#4a3410,#c8902a)}.k-Radio{background:linear-gradient(135deg,#1b2c44,#d98b5f)}.k-Video{background:linear-gradient(135deg,#1d2b2b,#3d8f86)}
+  .bar{display:block;height:4px;background:#243246}.bar i{display:block;height:100%;background:var(--blue)}
+  .tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .tools button{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:14px;border:1px solid var(--line);background:linear-gradient(#17212d,#101822);color:var(--silver);font-size:15px}
+  .redot{color:var(--red);display:inline-flex}
+  .modes{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .modes button{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;height:56px;border-radius:14px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);font-size:16px}
+  .modes button.on{border-color:var(--blue);color:#fff;background:#1FA8FF14}.ck{color:var(--blue);display:inline-flex}
+  .note{font-size:13px;color:var(--muted);margin:10px 0 0}.err{color:var(--red);font-size:13px}
   @media (max-width:800px){
-    .cols{flex-direction:column}
-    aside{width:auto}
-    .tiles{grid-template-columns:repeat(2,1fr)}
+    .stats{grid-template-columns:1fr}
+    .stat{padding:12px}
   }
 </style>

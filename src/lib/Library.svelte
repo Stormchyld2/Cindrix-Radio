@@ -11,7 +11,8 @@
     { kind: "Audiobook", label: "Audiobooks", key: "audiobook" },
     { kind: "Video", label: "Videos", key: "video" },
   ];
-  let kind = $state<Kind>("Music");
+  let { initial = "Music" }: { initial?: Kind } = $props();
+  let kind = $state<Kind>(initial);
   let query = $state("");
   let genre = $state<string | null>(null);
   let artist = $state<string | null>(null);

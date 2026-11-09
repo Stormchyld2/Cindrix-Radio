@@ -15,11 +15,14 @@
   import AdvancedPage from "./pages/AdvancedPage.svelte";
   import About from "./pages/About.svelte";
   import { store, settingsActions } from "./settings.svelte";
+  import { ui } from "./ui.svelte";
 
   // Subtabs are added here as each is built; the full list is in docs/010.
   const tabs = ["General", "Appearance", "Playback", "Audio & Equalizer", "Devices & Bluetooth", "Library & Sources", "Podcasts", "Internet Radio", "Audiobooks",
     "Karaoke & Lyrics", "LAN & Sharing", "Downloads & Storage", "Privacy & Security", "Backup & Restore", "Advanced & Diagnostics", "About", "Legal"] as const;
   let tab = $state<(typeof tabs)[number]>("General");
+  // Home shortcuts can open a particular page
+  $effect(() => { const t = ui.settingsTab; if (t && (tabs as readonly string[]).includes(t)) { tab = t as (typeof tabs)[number]; ui.settingsTab = null; } });
 </script>
 
 <div class="wrap">
