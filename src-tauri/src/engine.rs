@@ -85,6 +85,49 @@ impl<S: Source<Item = f32>> Source for EqSource<S> {
     fn total_duration(&self) -> Option<Duration> { self.inner.total_duration() }
 }
 
+static TRACE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// A short log of what the player is doing, shown in Settings → Advanced & Diagnostics.
+pub fn trace(msg: impl Into<String>) {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() % 100_000).unwrap_or(0);
+    let mut t = TRACE.lock().unwrap();
+    t.push(format!("[{secs}] {}", msg.into()));
+    if t.len() > 60 { t.remove(0); }
+}
+pub fn trace_dump() -> Vec<String> { TRACE.lock().unwrap().clone() }
+
+/// Counts decoded audio so the log can say when and why a file stopped.
+struct Counted<S: Source<Item = f32>> { inner: S, n: Arc<AtomicU64>, done: bool, rate: u32, ch: u16 }
+
+impl<S: Source<Item = f32>> Iterator for Counted<S> {
+    type Item = f32;
+    fn next(&mut self) -> Option<f32> {
+        match self.inner.next() {
+            Some(x) => { self.n.fetch_add(1, Ordering::Relaxed); Some(x) }
+            None => {
+                if !self.done {
+                    self.done = true;
+                    let secs = self.n.load(Ordering::Relaxed) as f64 / (self.rate.max(1) as f64 * self.ch.max(1) as f64);
+                    trace(format!("decoder ended after {secs:.1}s of audio"));
+                }
+                None
+            }
+        }
+    }
+}
+
+impl<S: Source<Item = f32>> Source for Counted<S> {
+    fn current_frame_len(&self) -> Option<usize> { self.inner.current_frame_len() }
+    fn channels(&self) -> u16 { self.inner.channels() }
+    fn sample_rate(&self) -> u32 { self.inner.sample_rate() }
+    fn total_duration(&self) -> Option<Duration> { self.inner.total_duration() }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        let r = self.inner.try_seek(pos);
+        if r.is_ok() { self.n.store((pos.as_secs_f64() * self.rate as f64 * self.ch as f64) as u64, Ordering::Relaxed); self.done = false; }
+        r
+    }
+}
+
 enum Cmd { Play(String), Ready(u64, StreamSource, StreamInfo), Pause, Resume, Stop, Volume(f32), Seek(u32) }
 
 #[derive(Clone, Default)]
@@ -142,8 +185,8 @@ impl Engine {
         std::thread::spawn(move || {
             let device = OutputStream::try_default();
             let (_stream, handle) = match device {
-                Ok(d) => d,
-                Err(e) => { st.lock().unwrap().error = Some(format!("No audio output: {e}")); 
+                Ok(d) => { trace("audio output opened"); d }
+                Err(e) => { trace(format!("no audio output: {e}")); st.lock().unwrap().error = Some(format!("No audio output: {e}")); 
                     // keep draining commands so callers never block
                     while rx.recv().is_ok() {}
                     return; }
@@ -163,14 +206,17 @@ impl Engine {
                             .and_then(|f| Decoder::new(BufReader::new(f)).map_err(|e| e.to_string()));
                         match opened {
                             Ok(dec) => {
-                                sink.append(EqSource::new(dec.convert_samples::<f32>(), sh.clone()));
+                                let (rate, ch, total) = (dec.sample_rate(), dec.channels(), dec.total_duration());
+                                trace(format!("play {} ({rate} Hz, {ch} ch, length {:?})", Path::new(&path).file_name().and_then(|n| n.to_str()).unwrap_or("?"), total.map(|d| d.as_secs())));
+                                let counted = Counted { inner: dec.convert_samples::<f32>(), n: Arc::new(AtomicU64::new(0)), done: false, rate, ch };
+                                sink.append(EqSource::new(counted, sh.clone()));
                                 sink.play();
                                 playing = true;
                                 is_stream = false;
                                 en.store(false, Ordering::SeqCst);
                                 st.lock().unwrap().error = None;
                             }
-                            Err(e) => { playing = false; st.lock().unwrap().error = Some(format!("Cannot play {path}: {e}")); }
+                            Err(e) => { trace(format!("cannot open file: {e}")); playing = false; st.lock().unwrap().error = Some(format!("Cannot play {path}: {e}")); }
                         }
                     }
                     Ok(Cmd::Ready(g, src, i)) => {
@@ -186,17 +232,18 @@ impl Engine {
                             st.lock().unwrap().error = None;
                         }
                     }
-                    Ok(Cmd::Pause) => sink.pause(),
-                    Ok(Cmd::Resume) => sink.play(),
-                    Ok(Cmd::Stop) => { sink.stop(); playing = false; }
+                    Ok(Cmd::Pause) => { trace("pause"); sink.pause() }
+                    Ok(Cmd::Resume) => { trace("resume"); sink.play() }
+                    Ok(Cmd::Stop) => { trace("stop"); sink.stop(); playing = false; }
                     Ok(Cmd::Volume(v)) => sink.set_volume(v),
-                    Ok(Cmd::Seek(secs)) => { let _ = sink.try_seek(Duration::from_secs(secs as u64)); }
+                    Ok(Cmd::Seek(secs)) => { let r = sink.try_seek(Duration::from_secs(secs as u64)); trace(format!("seek to {secs}s: {}", if r.is_ok() { "ok".to_string() } else { format!("failed ({:?})", r.err()) })); }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
                 let mut s = st.lock().unwrap();
                 s.position_secs = sink.get_pos().as_secs() as u32;
                 if playing && sink.empty() {
+                    trace(format!("output empty at position {}s", s.position_secs));
                     playing = false;
                     if is_stream { s.error = Some("The stream stopped. The station may have gone offline.".into()); }
                     else { en.store(true, Ordering::SeqCst); }

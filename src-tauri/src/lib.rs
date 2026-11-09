@@ -79,7 +79,7 @@ fn begin(engine: &Engine, h: &HistoryStore, lib: &LibraryStore, s: &mut PlayerSt
     if let Some(t) = s.current.as_ref().filter(|t| resumable(t)) {
         if let Some(k) = key_of(lib, t) {
             let at = h.resume_at(&k);
-            if at > 0 { engine.seek(at); s.position_secs = at; }
+            if at > 0 { engine::trace(format!("resuming at {at}s")); engine.seek(at); s.position_secs = at; }
         }
     }
 }
@@ -574,7 +574,7 @@ pub fn run() {
             playlists_get, playlist_create, playlist_rename, playlist_delete, playlist_add, playlist_remove, playlist_shift, favorite_toggle,
             video_sources, video_search, video_download, ytdl_status, ytdl_install, open_bluetooth_settings,
             admin::storage_report, admin::set_prefs, admin::set_pause_on_disconnect, admin::set_download_root, admin::privacy_clear,
-            admin::backup_make, admin::backup_list, admin::backup_restore, admin::backup_delete, admin::diagnostics
+            admin::backup_make, admin::backup_list, admin::backup_restore, admin::backup_delete, admin::diagnostics, admin::engine_trace
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cindrix Radio");

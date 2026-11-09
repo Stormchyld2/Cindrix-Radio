@@ -56,6 +56,7 @@ export const api = {
   backupList: () => call<BackupInfo[]>("backup_list", {}, () => []),
   backupRestore: (name: string) => call<number>("backup_restore", { name }, desktopOnly),
   backupDelete: (name: string) => call<void>("backup_delete", { name }, desktopOnly),
+  engineTrace: () => call<string[]>("engine_trace", {}, () => []),
   diagnostics: () => call<Diagnostics>("diagnostics", {}, () => ({ version: "browser", os: "browser", arch: "", data_dir: "", save_root: "", library_items: 0, private_build: false })),
   openBluetooth: () => call<void>("open_bluetooth_settings", {}, () => undefined),
   radioStations: () => call<Station[]>("radio_stations", {}, () => []),

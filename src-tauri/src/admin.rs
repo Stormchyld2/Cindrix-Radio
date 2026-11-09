@@ -146,6 +146,9 @@ pub fn backup_delete(name: String) -> Result<(), String> {
     std::fs::remove_file(backups_dir().join(name)).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn engine_trace() -> Vec<String> { crate::engine::trace_dump() }
+
 // ---- diagnostics ----
 #[derive(Serialize)]
 pub struct Diagnostics { pub version: String, pub os: String, pub arch: String, pub data_dir: String, pub save_root: String, pub library_items: usize, pub private_build: bool }
