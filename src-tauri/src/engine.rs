@@ -128,6 +128,17 @@ impl<S: Source<Item = f32>> Source for Counted<S> {
     }
 }
 
+/// Open a file and queue it on the sink (through the equalizer).
+fn append_file(sink: &Sink, path: &str, sh: &SharedEq) -> Result<(), String> {
+    let f = File::open(path).map_err(|e| e.to_string())?;
+    let dec = Decoder::new(BufReader::new(f)).map_err(|e| e.to_string())?;
+    let (rate, ch, total) = (dec.sample_rate(), dec.channels(), dec.total_duration());
+    trace(format!("play {} ({rate} Hz, {ch} ch, length {:?})", Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("?"), total.map(|d| d.as_secs())));
+    let counted = Counted { inner: dec.convert_samples::<f32>(), n: Arc::new(AtomicU64::new(0)), done: false, rate, ch };
+    sink.append(EqSource::new(counted, sh.clone()));
+    Ok(())
+}
+
 enum Cmd { Play(String), Ready(u64, StreamSource, StreamInfo), Pause, Resume, Stop, Volume(f32), Seek(u32) }
 
 #[derive(Clone, Default)]
@@ -183,36 +194,42 @@ impl Engine {
         let (gen_t, conn_t, info_t) = (gen.clone(), connecting.clone(), info.clone());
 
         std::thread::spawn(move || {
-            let device = OutputStream::try_default();
-            let (_stream, handle) = match device {
-                Ok(d) => { trace("audio output opened"); d }
-                Err(e) => { trace(format!("no audio output: {e}")); st.lock().unwrap().error = Some(format!("No audio output: {e}")); 
+            let open = |vol: f32| -> Result<(OutputStream, rodio::OutputStreamHandle, Sink), String> {
+                let (stream, handle) = OutputStream::try_default().map_err(|e| format!("No audio output: {e}"))?;
+                let sink = Sink::try_new(&handle).map_err(|e| format!("Audio error: {e}"))?;
+                sink.set_volume(vol);
+                Ok((stream, handle, sink))
+            };
+            let (mut _stream, mut _handle, mut sink) = match open(volume) {
+                Ok(t) => { trace("audio output opened"); t }
+                Err(e) => {
+                    trace(e.clone());
+                    st.lock().unwrap().error = Some(e);
                     // keep draining commands so callers never block
                     while rx.recv().is_ok() {}
-                    return; }
+                    return;
+                }
             };
-            let sink = match Sink::try_new(&handle) {
-                Ok(s) => s,
-                Err(e) => { st.lock().unwrap().error = Some(format!("Audio error: {e}")); while rx.recv().is_ok() {} return; }
-            };
-            sink.set_volume(volume);
+            let mut cur_vol = volume;
+            let mut cur_path: Option<String> = None;
+            let mut paused = false;
+            let mut last_pos = Duration::ZERO;
+            let mut last_move = std::time::Instant::now();
             let mut playing = false;
             let mut is_stream = false;
             loop {
                 match rx.recv_timeout(Duration::from_millis(250)) {
                     Ok(Cmd::Play(path)) => {
                         sink.stop();
-                        let opened = File::open(&path).map_err(|e| e.to_string())
-                            .and_then(|f| Decoder::new(BufReader::new(f)).map_err(|e| e.to_string()));
-                        match opened {
-                            Ok(dec) => {
-                                let (rate, ch, total) = (dec.sample_rate(), dec.channels(), dec.total_duration());
-                                trace(format!("play {} ({rate} Hz, {ch} ch, length {:?})", Path::new(&path).file_name().and_then(|n| n.to_str()).unwrap_or("?"), total.map(|d| d.as_secs())));
-                                let counted = Counted { inner: dec.convert_samples::<f32>(), n: Arc::new(AtomicU64::new(0)), done: false, rate, ch };
-                                sink.append(EqSource::new(counted, sh.clone()));
+                        match append_file(&sink, &path, &sh) {
+                            Ok(()) => {
                                 sink.play();
                                 playing = true;
+                                paused = false;
                                 is_stream = false;
+                                cur_path = Some(path);
+                                last_pos = Duration::ZERO;
+                                last_move = std::time::Instant::now();
                                 en.store(false, Ordering::SeqCst);
                                 st.lock().unwrap().error = None;
                             }
@@ -226,20 +243,50 @@ impl Engine {
                             sink.play();
                             playing = true;
                             is_stream = true;
+                            paused = false;
+                            cur_path = None;
                             en.store(false, Ordering::SeqCst);
                             *info_t.lock().unwrap() = Some(i);
                             conn_t.store(false, Ordering::SeqCst);
                             st.lock().unwrap().error = None;
                         }
                     }
-                    Ok(Cmd::Pause) => { trace("pause"); sink.pause() }
-                    Ok(Cmd::Resume) => { trace("resume"); sink.play() }
-                    Ok(Cmd::Stop) => { trace("stop"); sink.stop(); playing = false; }
-                    Ok(Cmd::Volume(v)) => sink.set_volume(v),
+                    Ok(Cmd::Pause) => { trace("pause"); paused = true; sink.pause() }
+                    Ok(Cmd::Resume) => { trace("resume"); paused = false; last_move = std::time::Instant::now(); sink.play() }
+                    Ok(Cmd::Stop) => { trace("stop"); sink.stop(); playing = false; cur_path = None; }
+                    Ok(Cmd::Volume(v)) => { cur_vol = v; sink.set_volume(v) }
                     Ok(Cmd::Seek(secs)) => { let r = sink.try_seek(Duration::from_secs(secs as u64)); trace(format!("seek to {secs}s: {}", if r.is_ok() { "ok".to_string() } else { format!("failed ({:?})", r.err()) })); }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
+                // Watchdog: if the phone's audio route changed (Bluetooth, headset) the output can go
+                // silent while the clock stands still. Reopen the output and carry on from there.
+                let pos = sink.get_pos();
+                if playing && !paused && !is_stream && cur_path.is_some() && !sink.empty() {
+                    if pos != last_pos { last_pos = pos; last_move = std::time::Instant::now(); }
+                    else if last_move.elapsed() > Duration::from_secs(3) {
+                        trace(format!("output stalled at {}s; reopening the audio output", pos.as_secs()));
+                        match open(cur_vol) {
+                            Ok((ns, nh, nsink)) => {
+                                let path = cur_path.clone().unwrap_or_default();
+                                match append_file(&nsink, &path, &sh) {
+                                    Ok(()) => {
+                                        let r = nsink.try_seek(pos);
+                                        trace(format!("reopened; seek back to {}s: {}", pos.as_secs(), if r.is_ok() { "ok".to_string() } else { format!("failed ({:?})", r.err()) }));
+                                        nsink.play();
+                                        sink.stop();
+                                        sink = nsink;
+                                        _handle = nh;
+                                        _stream = ns;
+                                    }
+                                    Err(e) => trace(format!("reopen failed: {e}")),
+                                }
+                            }
+                            Err(e) => trace(format!("reopen failed: {e}")),
+                        }
+                        last_move = std::time::Instant::now();
+                    }
+                } else { last_pos = pos; last_move = std::time::Instant::now(); }
                 let mut s = st.lock().unwrap();
                 s.position_secs = sink.get_pos().as_secs() as u32;
                 if playing && sink.empty() {
