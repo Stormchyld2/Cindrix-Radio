@@ -16,6 +16,7 @@ export interface Diagnostics { version: string; os: string; arch: string; data_d
 
 export interface Episode { guid: string; title: string; enclosure_url: string; published: string | null; duration_secs: number | null; file: string | null; played: boolean }
 export interface Feed { id: string; url: string; title: string; image: string | null; episodes: Episode[] }
+export interface PodHit { name: string; author: string; feed_url: string; image: string | null; genre: string }
 export interface ImportResult { feeds: Feed[]; failed: string[] }
 
 export interface LibItem { id: string; source_id: string; path: string; kind: Kind; title: string; artist: string; album: string; genre: string | null; folder_genre: string | null; group: string; duration_secs: number | null; published?: string | null; description?: string | null; available: boolean }
@@ -49,6 +50,7 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_d
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  podcastSearch: (q: string) => call<PodHit[]>("podcast_search", { q }, () => []),
   audiobookSearch: (q: string) => call<BookHit[]>("audiobook_search", { q }, () => []),
   audiobookDownload: (id: string, title: string) => call<number>("audiobook_download", { id, title }, () => 0),
   storageReport: () => call<StorageReport>("storage_report", {}, () => ({ rows: [], free: 0, total: 0, root_exists: false })),

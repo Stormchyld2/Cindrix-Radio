@@ -184,6 +184,27 @@ fn client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|e| e.to_string())
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct PodHit { pub name: String, pub author: String, pub feed_url: String, pub image: Option<String>, pub genre: String }
+
+/// Search the public podcast directory (Apple's free search, no account) by name, topic or idea.
+pub fn search(q: &str) -> Result<Vec<PodHit>, String> {
+    let q = q.trim();
+    if q.is_empty() { return Err("Type a topic or a podcast name first".into()); }
+    let body: serde_json::Value = client()?.get("https://itunes.apple.com/search")
+        .query(&[("media", "podcast"), ("entity", "podcast"), ("limit", "25"), ("term", q)])
+        .send().and_then(|r| r.error_for_status()).map_err(|e| format!("Could not search: {e}"))?
+        .text().map_err(|e| e.to_string())
+        .and_then(|t| serde_json::from_str(&t).map_err(|e| format!("Unexpected answer from the podcast directory: {e}")))?;
+    let s = |v: &serde_json::Value| v.as_str().unwrap_or("").to_string();
+    Ok(body["results"].as_array().cloned().unwrap_or_default().iter().filter_map(|r| {
+        let feed_url = s(&r["feedUrl"]);
+        if !is_http(&feed_url) { return None; }
+        Some(PodHit { name: s(&r["collectionName"]), author: s(&r["artistName"]), feed_url,
+            image: Some(s(&r["artworkUrl100"])).filter(|u| !u.is_empty()), genre: s(&r["primaryGenreName"]) })
+    }).collect())
+}
+
 pub fn fetch_feed(url: &str) -> Result<Feed, String> {
     if !is_http(url) { return Err("Enter a web address starting with http:// or https://".into()); }
     let body = client()?.get(url.trim()).send().and_then(|r| r.error_for_status())

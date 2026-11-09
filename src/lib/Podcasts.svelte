@@ -1,7 +1,7 @@
 <script lang="ts">
   import RowMenu from "./RowMenu.svelte";
   import { onMount } from "svelte";
-  import { api, type Feed, type Episode } from "./api";
+  import { api, type Feed, type Episode, type PodHit } from "./api";
   import { actions } from "./player.svelte";
   import { store } from "./settings.svelte";
 
@@ -30,6 +30,28 @@
     const r = await run("Adding feed…", () => api.podcastAdd(url.trim()));
     if (r) { feeds = r; url = ""; }
   };
+  // ---- find podcasts by topic or idea (e.g. "prepper")
+  let sq = $state("");
+  let hits = $state<PodHit[]>([]);
+  let searched = $state(false);
+  const subscribed = (h: PodHit) => feeds.some((f) => f.url === h.feed_url);
+  async function findPods() {
+    if (!sq.trim()) return;
+    const r = await run("Searching podcasts…", () => api.podcastSearch(sq));
+    if (r) { hits = r; searched = true; if (!r.length) message = "No podcasts matched. Try a different word."; }
+  }
+  async function subscribe(h: PodHit, latest = false) {
+    const r = await run(latest ? "Subscribing and downloading the newest episode…" : "Subscribing…", async () => {
+      let list = await api.podcastAdd(h.feed_url);
+      if (latest) {
+        const f = list.find((x) => x.url === h.feed_url);
+        const e = f?.episodes.find((x) => !x.file);
+        if (f && e) list = await api.podcastDownload(f.id, e.guid);
+      }
+      return list;
+    });
+    if (r) feeds = r;
+  }
   const refresh = async () => {
     const r = await run("Checking feeds…", () => api.podcastRefresh());
     if (r) { feeds = r.feeds; if (r.failed.length) message = `Could not update: ${r.failed.join("; ")}`; }
@@ -72,8 +94,27 @@
     <label class="btn file">Import OPML<input type="file" accept=".opml,.xml,text/xml" onchange={importOpml} hidden /></label>
     <button class="btn" disabled={!!busy || !feeds.length} onclick={refresh}>Check for new episodes</button>
   </div>
+  <form class="bar" class:hide={gridDown} onsubmit={(e) => { e.preventDefault(); findPods(); }}>
+    <input class="field" type="search" enterkeyhint="search" placeholder="Find podcasts by topic or idea (try: prepper)" bind:value={sq} />
+    <button class="btn primary" type="submit" disabled={!sq.trim() || !!busy}>Search</button>
+  </form>
   {#if busy}<p class="status">{busy}</p>{/if}
   {#if message}<p class="status err">{message}</p>{/if}
+
+  {#if hits.length}
+    <h3 class="sec">Results for “{sq}” <button class="btn" onclick={() => { hits = []; searched = false; }}>Clear</button></h3>
+    <div class="hits">
+      {#each hits as h (h.feed_url)}
+        <div class="hit card">
+          {#if h.image}<img src={h.image} alt="" />{:else}<div class="ph s">{h.name.slice(0, 2).toUpperCase()}</div>{/if}
+          <div class="hm"><b>{h.name}</b><span>{h.author}{h.genre ? ` · ${h.genre}` : ""}</span></div>
+          {#if subscribed(h)}<span class="tag">Subscribed ✓</span>
+          {:else}<div class="ha"><button class="btn primary" disabled={!!busy} onclick={() => subscribe(h)}>Subscribe</button>
+            <button class="btn" disabled={!!busy} onclick={() => subscribe(h, true)}>Subscribe + newest ⬇</button></div>{/if}
+        </div>
+      {/each}
+    </div>
+  {/if}
 
   {#if feeds.length === 0}
     <div class="card empty">No podcasts yet. Paste an RSS link above, or import an OPML file from another podcast app.</div>
@@ -113,6 +154,12 @@
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .bar h3{flex:1}
   .hide{display:none}
+  .sec{display:flex;align-items:center;gap:10px;font-size:16px;margin:14px 0 8px}
+  .hits{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .hit{display:flex;align-items:center;gap:10px;padding:10px;flex-wrap:wrap}
+  .hit img,.ph.s{width:52px;height:52px;border-radius:10px;flex:none;object-fit:cover;aspect-ratio:auto;font-size:18px}
+  .hm{flex:1;min-width:140px;display:flex;flex-direction:column}.hm b{overflow-wrap:anywhere}.hm span{font-size:12px;color:var(--muted)}
+  .ha{display:flex;gap:6px;flex-wrap:wrap}
   .field{flex:1;min-width:0;height:36px;border-radius:10px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 12px}
   .file{display:inline-flex;align-items:center;cursor:pointer}
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}
