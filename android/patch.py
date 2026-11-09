@@ -22,6 +22,10 @@ for f in ("MainActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.k
 g = next(pathlib.Path("src-tauri/gen/android/app").glob("build.gradle.kts"))
 t = g.read_text()
 t = re.sub(r"^android \{", "android {\n    packaging { jniLibs { useLegacyPackaging = true } }", t, count=1, flags=re.M)
+# private sideloaded build: older, calmer Android behaviour; plain-http radio logos allowed; no R8 surprises
+t = t.replace("targetSdk = 37", "targetSdk = 35")
+t = t.replace('manifestPlaceholders["usesCleartextTraffic"] = "false"', 'manifestPlaceholders["usesCleartextTraffic"] = "true"')
+t = t.replace("enable = true", "enable = false")
 t += '\ndependencies {\n    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")\n}\n'
 g.write_text(t)
 

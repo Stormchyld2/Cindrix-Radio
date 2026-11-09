@@ -531,6 +531,12 @@ fn radio_record(e: State<Engine>, start: bool, name: String) -> Result<Option<St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // On the phone, a panic is written where the Kotlin side shows it on the next start.
+    #[cfg(target_os = "android")]
+    std::panic::set_hook(Box::new(|info| {
+        let text = format!("Rust panic: {info}\n{}", std::backtrace::Backtrace::force_capture());
+        let _ = std::fs::write("/data/data/app.cindrix.radio/files/rust-crash.txt", text);
+    }));
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Player::new())

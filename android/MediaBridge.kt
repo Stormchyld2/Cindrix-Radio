@@ -71,6 +71,9 @@ object MediaBridge {
     if (playing && !wasPlaying) requestFocus()
     if (!playing && wasPlaying && !lostFocus) abandonFocus()
     wasPlaying = playing
+    if (playing && !PlaybackService.running) {
+      try { ctx.startForegroundService(Intent(ctx, PlaybackService::class.java)) } catch (e: Throwable) {}
+    }
     PlaybackService.refresh(ctx, title, subtitle, playing)
   }
 

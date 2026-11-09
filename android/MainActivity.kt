@@ -1,6 +1,9 @@
 package app.cindrix.radio
 
 import android.Manifest
+import android.app.Activity
+import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -10,24 +13,55 @@ import android.provider.Settings
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.io.File
 
 class MainActivity : TauriActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    MediaBridge.init(this)
-    // keep the app clear of the status bar, navigation bar and keyboard
-    val root = findViewById<View>(android.R.id.content)
-    ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-      val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
-      v.setPadding(b.left, b.top, b.right, b.bottom)
-      insets
+  private fun crashFile(): File = File(getExternalFilesDir(null) ?: filesDir, "crash.txt")
+
+  // Anything that crashes the app is written down and shown on the next start.
+  private fun installCrashHandler() {
+    val prev = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { t, e ->
+      try { crashFile().writeText("Crash in thread " + t.name + ":\n" + android.util.Log.getStackTraceString(e)) } catch (_: Throwable) {}
+      prev?.uncaughtException(t, e)
     }
-    askPermissions()
+  }
+
+  private fun showLastCrash() {
     try {
-      startForegroundService(Intent(this, PlaybackService::class.java))
-    } catch (e: Exception) {
-      // playback still works while the app is open
-    }
+      val sb = StringBuilder()
+      val f = crashFile()
+      if (f.exists()) { sb.append(f.readText().take(1800)); f.delete() }
+      val r = File(filesDir, "rust-crash.txt")
+      if (r.exists()) { sb.append("\n").append(r.readText().take(1800)); r.delete() }
+      if (Build.VERSION.SDK_INT >= 30) {
+        val am = getSystemService(ActivityManager::class.java)
+        am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()?.let {
+          if (it.reason in listOf(2, 4, 5, 6, 7)) sb.append("\nLast exit: reason ").append(it.reason).append(" - ").append(it.description)
+        }
+      }
+      if (sb.isNotEmpty()) {
+        AlertDialog.Builder(this).setTitle("Cindrix Radio closed unexpectedly last time")
+          .setMessage(sb.toString()).setPositiveButton("OK", null).show()
+      }
+    } catch (_: Throwable) {}
+  }
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    installCrashHandler()
+    super.onCreate(savedInstanceState)
+    try {
+      // keep the app clear of the status bar, navigation bar and keyboard
+      val root = findViewById<View>(android.R.id.content)
+      ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+        val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+        v.setPadding(b.left, b.top, b.right, b.bottom)
+        insets
+      }
+    } catch (_: Throwable) {}
+    try { MediaBridge.init(this) } catch (_: Throwable) {}
+    showLastCrash()
+    try { askPermissions() } catch (_: Throwable) {}
   }
 
   private fun askPermissions() {
@@ -43,7 +77,7 @@ class MainActivity : TauriActivity() {
 
   override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    askAllFiles()
+    try { askAllFiles() } catch (_: Throwable) {}
   }
 
   // The library scan and Downloads/Cindrix use ordinary file paths, which needs all-files access.
@@ -52,7 +86,7 @@ class MainActivity : TauriActivity() {
       try {
         startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName")))
       } catch (e: Exception) {
-        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        try { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) } catch (_: Exception) {}
       }
     }
   }

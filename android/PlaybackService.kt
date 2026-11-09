@@ -19,6 +19,7 @@ class PlaybackService : Service() {
     var subtitle = ""
     var playing = false
     var instance: PlaybackService? = null
+    val running get() = instance != null
 
     fun refresh(ctx: Context, t: String, s: String, p: Boolean) {
       title = t; subtitle = s; playing = p
@@ -55,7 +56,7 @@ class PlaybackService : Service() {
 
   fun post() {
     val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-    val ic = if (applicationInfo.icon != 0) applicationInfo.icon else android.R.drawable.ic_media_play
+    val ic = android.R.drawable.ic_media_play
     val style = Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
     MediaBridge.session?.let { style.setMediaSession(it.sessionToken) }
     val n = Notification.Builder(this, "playback")
@@ -69,7 +70,11 @@ class PlaybackService : Service() {
       .addAction(action("toggle", if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, if (playing) "Pause" else "Play"))
       .addAction(action("next", android.R.drawable.ic_media_next, "Next"))
       .build()
-    if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-    else startForeground(1, n)
+    try {
+      if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+      else startForeground(1, n)
+    } catch (e: Throwable) {
+      stopSelf()
+    }
   }
 }
