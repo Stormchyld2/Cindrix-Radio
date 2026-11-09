@@ -23,7 +23,28 @@ object MediaBridge {
   private var lostFocus = false
   private var focusReq: AudioFocusRequest? = null
 
+  // short log of audio-route events for the Player log (Settings > Advanced & Diagnostics)
+  private val events = java.util.ArrayDeque<String>()
+  private val clock = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+  fun note(m: String) { synchronized(events) { events.addLast(clock.format(java.util.Date()) + " " + m); while (events.size > 60) events.removeFirst() } }
+
+  private fun devs(list: Array<out android.media.AudioDeviceInfo>?): String =
+    list?.joinToString(", ") { "type ${it.type} '${it.productName}'" } ?: "?"
+
+  @JvmStatic
+  fun dumpLog(): String {
+    val sb = StringBuilder()
+    try {
+      val am = ctx.getSystemService(AudioManager::class.java)
+      sb.append("now: mode ${am.mode}, A2DP ${am.isBluetoothA2dpOn}, SCO ${am.isBluetoothScoOn}, speaker ${am.isSpeakerphoneOn}, output rate ${am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)}, frames/buffer ${am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)}\n")
+      sb.append("outputs: ").append(devs(am.getDevices(AudioManager.GET_DEVICES_OUTPUTS))).append("\n")
+    } catch (t: Throwable) { sb.append("route info failed: $t\n") }
+    synchronized(events) { events.forEach { sb.append(it).append("\n") } }
+    return sb.toString()
+  }
+
   private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+    note("audio focus change $change")
     when (change) {
       AudioManager.AUDIOFOCUS_LOSS -> { lostFocus = false; nativeCommand("pause") }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> if (wasPlaying) { lostFocus = true; nativeCommand("pause") }
@@ -32,7 +53,7 @@ object MediaBridge {
   }
 
   private val noisy = object : BroadcastReceiver() {
-    override fun onReceive(c: Context?, i: Intent?) { nativeCommand("noisy") }
+    override fun onReceive(c: Context?, i: Intent?) { note("becoming noisy"); nativeCommand("noisy") }
   }
 
   @JvmStatic
@@ -55,8 +76,8 @@ object MediaBridge {
     val am = ctx.getSystemService(AudioManager::class.java)
     val h = android.os.Handler(android.os.Looper.getMainLooper())
     val cb = object : android.media.AudioDeviceCallback() {
-      override fun onAudioDevicesAdded(d: Array<out android.media.AudioDeviceInfo>?) { h.postDelayed({ nativeCommand("reroute") }, 900) }
-      override fun onAudioDevicesRemoved(d: Array<out android.media.AudioDeviceInfo>?) { h.postDelayed({ nativeCommand("reroute") }, 900) }
+      override fun onAudioDevicesAdded(d: Array<out android.media.AudioDeviceInfo>?) { note("device added: ${devs(d)}"); h.postDelayed({ nativeCommand("reroute") }, 900) }
+      override fun onAudioDevicesRemoved(d: Array<out android.media.AudioDeviceInfo>?) { note("device removed: ${devs(d)}"); h.postDelayed({ nativeCommand("reroute") }, 900) }
     }
     am.registerAudioDeviceCallback(cb, h)
   }

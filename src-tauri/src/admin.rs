@@ -165,7 +165,16 @@ pub fn backup_delete(name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn engine_trace() -> Vec<String> { crate::engine::trace_dump() }
+pub fn engine_trace() -> Vec<String> {
+    #[allow(unused_mut)]
+    let mut v = crate::engine::trace_dump();
+    #[cfg(target_os = "android")]
+    {
+        v.push("---- Android audio route ----".into());
+        v.extend(crate::android::media_log().lines().map(|l| l.to_string()));
+    }
+    v
+}
 
 // ---- diagnostics ----
 #[derive(Serialize)]

@@ -97,6 +97,9 @@ static LAST: Mutex<(String, bool, u64)> = Mutex::new((String::new(), false, 0));
 
 /// Called from the 500 ms player poll. Pushes changes (track, play/pause, a position jump or
 /// every 10 s) to the MediaSession so the lock screen, car and headset show the right thing.
+/// Audio route and focus events recorded on the Kotlin side, for the Player log.
+pub fn media_log() -> String { call_string(MEDIA, "dumpLog", &format!("(){S}"), &[]).unwrap_or_default() }
+
 pub fn media_sync(s: &PlayerState) {
     let Some(t) = s.current.as_ref() else {
         let mut l = LAST.lock().unwrap();
