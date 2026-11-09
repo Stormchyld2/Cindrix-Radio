@@ -64,9 +64,9 @@
     { id: "home", label: "Home", icon: "home", tab: "Dashboard" },
     { id: "music", label: "Music", icon: "music", tab: "Library", arg: "Music" },
     { id: "radio", label: "Radio", icon: "radio", tab: "Radio", online: true },
-    { id: "podcasts", label: "Podcasts", icon: "podcast", tab: "Podcasts" },
+    { id: "podcasts", label: "Podcasts", icon: "podcast", tab: "Podcasts", online: true },
     { id: "audiobooks", label: "Audiobooks", icon: "book", tab: "Library", arg: "Audiobook" },
-    { id: "videos", label: "Videos", icon: "video", tab: "Videos" },
+    { id: "videos", label: "Videos", icon: "video", tab: "Videos", online: true },
     { id: "playlists", label: "Playlists", icon: "list", tab: "Playlists" },
     { id: "favorites", label: "Favorites", icon: "star", tab: "Favorites" },
     { id: "karaoke", label: "Karaoke", icon: "karaoke", tab: "Karaoke" },
@@ -91,7 +91,7 @@
     if (n.car) { ui.car = true; ui.np = true; menu = false; return; }
     navigate(n.tab, n.arg, n.id);
   }
-  $effect(() => { if (store.s?.grid_down && active === "Radio") navigate("Dashboard"); });
+  $effect(() => { if (store.s?.grid_down && ["Radio", "Podcasts", "Videos"].includes(active)) navigate("Library", "Music"); });
   const back = $derived(store.s?.prefs.skip_back ?? 15);
   const heading = $derived(active === "Dashboard" ? "Home" : active === "Library" ? (libKind === "Audiobook" ? "Audiobooks" : "Music") : active);
   // keep the position and queue in step with the audio engine
