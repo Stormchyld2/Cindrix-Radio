@@ -190,6 +190,7 @@
 {/if}
 
 <style>
+  @media (max-width:520px){.badge{display:none}.logo{width:38px;height:38px}}
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
   .search{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 14px;font-size:15px}
   .file{display:inline-flex;align-items:center;cursor:pointer}
@@ -203,7 +204,8 @@
   .sec{margin:18px 0 8px;font-size:18px}.sec span{font-size:12px;color:var(--muted);margin-left:6px;font-family:Inter,sans-serif}
   .note{font-size:13px;color:var(--muted);margin:6px 0}.note.small{font-size:11px;margin-top:18px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:10px}
-  .st{display:flex;align-items:center;gap:10px;height:68px;padding:0 12px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+  .grid>*{min-width:0}
+  .st{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;box-sizing:border-box;height:68px;padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
   .st.on{border-color:var(--blue);background:#1FA8FF0F}
   .logo{position:relative;width:44px;height:44px;border-radius:10px;flex:none;overflow:hidden;background:linear-gradient(135deg,#1B2C44,#5F7FA6);display:flex;align-items:center;justify-content:center;font:700 16px Rajdhani,sans-serif;color:#F1F4F8}
   .logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#0D1620}
@@ -211,7 +213,7 @@
   .meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .meta span{font-size:12px;color:var(--muted)}
   .st.on .meta span{color:var(--lblue)}
-  .badge{font-size:11px;color:var(--muted);border:1px solid #2A3747;border-radius:8px;padding:2px 6px;flex:none}
+  .badge{font-size:11px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);border:1px solid #2A3747;border-radius:8px;padding:2px 6px;flex:none}
   .heart{border:0;background:transparent;color:var(--muted);font-size:20px;flex:none}.heart.on{color:var(--blue)}
   .rec{width:28px;height:28px;border-radius:14px;border:1px solid var(--red);background:transparent;color:var(--red);font-size:12px;flex:none}
   .rec.live{background:var(--red);color:#fff}

@@ -323,12 +323,25 @@ impl Engine {
         self.send(Cmd::Stop);
         let (tx, url) = (self.tx.lock().unwrap().clone(), url.to_string());
         let (now, rec, gen, conn, status) = (self.now.clone(), self.rec.clone(), self.gen.clone(), self.connecting.clone(), self.status.clone());
-        std::thread::spawn(move || match stream::open(&url, now, rec) {
-            Ok(o) => { let _ = tx.send(Cmd::Ready(g, o.source, o.info)); }
-            Err(e) => {
-                if gen.load(Ordering::SeqCst) == g {
-                    conn.store(false, Ordering::SeqCst);
-                    status.lock().unwrap().error = Some(e);
+        std::thread::spawn(move || {
+            trace(format!("radio: connecting to {url}"));
+            let (rtx, rrx) = std::sync::mpsc::channel();
+            let u2 = url.clone();
+            std::thread::spawn(move || {
+                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| stream::open(&u2, now, rec)))
+                    .unwrap_or_else(|_| Err("The stream decoder crashed on this station".to_string()));
+                let _ = rtx.send(r);
+            });
+            let res = rrx.recv_timeout(std::time::Duration::from_secs(25))
+                .unwrap_or_else(|_| Err("This station did not answer in time. Try another one.".to_string()));
+            match res {
+                Ok(o) => { trace(format!("radio: connected ({:?})", o.info.content_type)); let _ = tx.send(Cmd::Ready(g, o.source, o.info)); }
+                Err(e) => {
+                    trace(format!("radio: failed: {e}"));
+                    if gen.load(Ordering::SeqCst) == g {
+                        conn.store(false, Ordering::SeqCst);
+                        status.lock().unwrap().error = Some(e);
+                    }
                 }
             }
         });

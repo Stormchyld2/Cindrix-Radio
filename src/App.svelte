@@ -188,7 +188,7 @@
   .navbtn{height:46px;display:flex;align-items:center;gap:14px;text-align:left;padding:0 14px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--silver);font-size:15px}
   .navbtn.on{background:linear-gradient(#1b3a55,#12283c);border-color:var(--blue);color:#fff;box-shadow:0 0 14px #1fa8ff33}
   .navbtn.on :global(svg){color:var(--blue)}
-  main{padding:20px;overflow:auto}
+  main{padding:20px;overflow:auto;overflow-x:hidden;min-width:0}
   footer{grid-column:1/3;display:flex;align-items:center;gap:22px;padding:0 20px;border-top:1px solid var(--blue);background:linear-gradient(#0f1823,#0a0e13);position:relative}
   .np{display:flex;align-items:center;gap:12px;text-align:left;font-size:14px;min-width:0;width:300px;flex:none;border:0;background:transparent;color:inherit;padding:0;font-family:inherit}
   .thumb{width:56px;height:56px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#3b2a66,#d98b5f);color:#fff}
