@@ -139,7 +139,7 @@ fn append_file(sink: &Sink, path: &str, sh: &SharedEq) -> Result<(), String> {
     Ok(())
 }
 
-enum Cmd { Play(String), Ready(u64, StreamSource, StreamInfo), Pause, Resume, Stop, Volume(f32), Seek(u32) }
+enum Cmd { Play(String), Ready(u64, StreamSource, StreamInfo), Pause, Resume, Stop, Volume(f32), Seek(u32), Reroute }
 
 #[derive(Clone, Default)]
 pub struct Status {
@@ -194,6 +194,7 @@ impl Engine {
         let (gen_t, conn_t, info_t) = (gen.clone(), connecting.clone(), info.clone());
 
         std::thread::spawn(move || {
+            let mut force = false;
             let open = |vol: f32| -> Result<(OutputStream, rodio::OutputStreamHandle, Sink), String> {
                 let (stream, handle) = OutputStream::try_default().map_err(|e| format!("No audio output: {e}"))?;
                 let sink = Sink::try_new(&handle).map_err(|e| format!("Audio error: {e}"))?;
@@ -251,6 +252,7 @@ impl Engine {
                             st.lock().unwrap().error = None;
                         }
                     }
+                    Ok(Cmd::Reroute) => { trace("audio device changed"); force = true }
                     Ok(Cmd::Pause) => { trace("pause"); paused = true; sink.pause() }
                     Ok(Cmd::Resume) => { trace("resume"); paused = false; last_move = std::time::Instant::now(); sink.play() }
                     Ok(Cmd::Stop) => { trace("stop"); sink.stop(); playing = false; cur_path = None; }
@@ -264,7 +266,8 @@ impl Engine {
                 let pos = sink.get_pos();
                 if playing && !paused && !is_stream && cur_path.is_some() && !sink.empty() {
                     if pos != last_pos { last_pos = pos; last_move = std::time::Instant::now(); }
-                    else if last_move.elapsed() > Duration::from_secs(3) {
+                    if force || (pos == last_pos && last_move.elapsed() > Duration::from_secs(3)) {
+                        force = false;
                         trace(format!("output stalled at {}s; reopening the audio output", pos.as_secs()));
                         match open(cur_vol) {
                             Ok((ns, nh, nsink)) => {
@@ -286,7 +289,7 @@ impl Engine {
                         }
                         last_move = std::time::Instant::now();
                     }
-                } else { last_pos = pos; last_move = std::time::Instant::now(); }
+                } else { force = false; last_pos = pos; last_move = std::time::Instant::now(); }
                 let mut s = st.lock().unwrap();
                 s.position_secs = sink.get_pos().as_secs() as u32;
                 if playing && sink.empty() {
@@ -372,6 +375,7 @@ impl Engine {
     }
     pub fn set_volume(&self, v: f32) { self.send(Cmd::Volume(v)) }
     pub fn seek(&self, secs: u32) { self.send(Cmd::Seek(secs)) }
+    pub fn reroute(&self) { self.send(Cmd::Reroute) }
     pub fn set_eq(&self, s: EqSettings) { self.eq.set(s) }
     pub fn status(&self) -> Status {
         let mut s = self.status.lock().unwrap().clone();

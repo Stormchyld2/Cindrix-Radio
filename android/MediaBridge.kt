@@ -51,6 +51,14 @@ object MediaBridge {
     session = s
     val f = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
     if (Build.VERSION.SDK_INT >= 33) ctx.registerReceiver(noisy, f, Context.RECEIVER_EXPORTED) else ctx.registerReceiver(noisy, f)
+    // Bluetooth / headset connected or removed: tell the player to reopen its audio output
+    val am = ctx.getSystemService(AudioManager::class.java)
+    val h = android.os.Handler(android.os.Looper.getMainLooper())
+    val cb = object : android.media.AudioDeviceCallback() {
+      override fun onAudioDevicesAdded(d: Array<out android.media.AudioDeviceInfo>?) { h.postDelayed({ nativeCommand("reroute") }, 900) }
+      override fun onAudioDevicesRemoved(d: Array<out android.media.AudioDeviceInfo>?) { h.postDelayed({ nativeCommand("reroute") }, 900) }
+    }
+    am.registerAudioDeviceCallback(cb, h)
   }
 
   @JvmStatic

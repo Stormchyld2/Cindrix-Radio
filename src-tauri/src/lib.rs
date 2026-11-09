@@ -128,6 +128,7 @@ pub(crate) fn media_command(app: &tauri::AppHandle, cmd: &str) {
         "toggle" => { player_toggle(app.state(), app.state(), app.state(), app.state()); }
         "next" => { player_next(app.state(), app.state(), app.state(), app.state()); }
         "prev" => { player_seek(app.state(), app.state(), 0); }
+        "reroute" => { app.state::<Engine>().reroute(); }
         "noisy" if playing && app.state::<AppSettings>().inner.lock().unwrap().pause_on_disconnect => {
             player_toggle(app.state(), app.state(), app.state(), app.state());
         }

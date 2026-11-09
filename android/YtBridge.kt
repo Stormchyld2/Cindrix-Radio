@@ -10,7 +10,18 @@ object YtBridge {
   @Synchronized
   private fun ensure() {
     if (!ready) {
-      YoutubeDL.getInstance().init(MediaBridge.ctx)
+      try {
+        YoutubeDL.getInstance().init(MediaBridge.ctx)
+      } catch (t: Throwable) {
+        val sb = StringBuilder("yt-dlp helper failed to start: ")
+        var c: Throwable? = t
+        var n = 0
+        while (c != null && n < 5) {
+          sb.append(c.toString()).append(" @ ").append(c.stackTrace.firstOrNull()?.toString() ?: "").append(" | ")
+          c = c.cause; n++
+        }
+        throw RuntimeException(sb.toString())
+      }
       ready = true
     }
   }
