@@ -29,7 +29,7 @@
 
 {#if v}
   <div class="wrap" role="dialog" aria-modal="true" aria-label="Video player">
-    <div class="bar"><b>{v.title}</b><button class="btn" onclick={videoActions.close}>Close ✕</button></div>
+    <div class="bar"><button class="btn back" onclick={videoActions.close} aria-label="Back to videos">← Back</button><b>{v.title}</b></div>
     {#if src}
       <!-- svelte-ignore a11y_media_has_caption -->
       <video bind:this={el} {src} controls autoplay onloadedmetadata={loaded} ontimeupdate={tick} onended={ended} onerror={failed}></video>
@@ -42,8 +42,8 @@
 {/if}
 
 <style>
-  .wrap{position:fixed;inset:0;background:#000000F2;z-index:30;display:flex;flex-direction:column;padding:14px 18px;gap:10px}
-  .bar{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .wrap{position:fixed;inset:0;background:#000000F2;z-index:30;display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));gap:10px}
+  .bar{display:flex;align-items:center;gap:12px;min-width:0}.back{flex:none;min-height:44px;padding:0 16px;font-size:15px}
   .bar b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   video,iframe{flex:1;min-height:0;width:100%;border:0;background:#000;border-radius:10px}
   .hint{font-size:12px;color:var(--muted);margin:0}

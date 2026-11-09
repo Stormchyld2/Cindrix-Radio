@@ -15,6 +15,7 @@
   import Icon from "./lib/Icon.svelte";
   import { noteListening } from "./lib/recent.svelte";
   import { ui } from "./lib/ui.svelte";
+  import { video, videoActions } from "./lib/video.svelte";
   import { api } from "./lib/api";
   import { store, settingsActions, TERMS_VERSION } from "./lib/settings.svelte";
 
@@ -85,6 +86,20 @@
     activeId = id ?? nav.find((n) => n.tab === tab && n.arg === arg)?.id ?? nav.find((n) => n.tab === tab)?.id ?? (tab === "Settings" ? "" : activeId);
     menu = false;
   }
+  // Phone back button: close the top screen (video, full player, menu, then go Home) instead of leaving the app.
+  const topLayer = $derived(video.open ? "video" : ui.np ? "np" : menu ? "menu" : active !== "Dashboard" ? "tab" : null);
+  let armed = false;
+  function arm() { try { history.pushState({ cx: 1 }, ""); armed = true; } catch { /* no history */ } }
+  $effect(() => { if (topLayer && !armed) arm(); });
+  function onBack() {
+    armed = false;
+    if (video.open) videoActions.close();
+    else if (ui.np) { ui.np = false; ui.car = false; }
+    else if (menu) menu = false;
+    else if (active !== "Dashboard") navigate("Dashboard");
+    else return; // already Home with nothing open: the next back press leaves the app
+    arm();
+  }
   function pickNav(n: NavItem) {
     if (n.car) { ui.car = true; ui.np = true; menu = false; return; }
     navigate(n.tab, n.arg, n.id);
@@ -103,6 +118,7 @@
   <TermsGate />
 {/if}
 
+<svelte:window onpopstate={onBack} />
 <VideoPlayer />
 <NowPlaying />
 
