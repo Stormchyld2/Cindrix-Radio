@@ -103,8 +103,7 @@
         <button class="play" disabled={!e.file} title={e.file ? "Play" : "Download to play"} aria-label="Play {e.title}" onclick={() => play(open, e)}>▶</button>
         <div class="meta"><b>{e.title}</b><span>{e.published ?? ""} {fmt(e.duration_secs)}</span></div>
         {#if e.file}<span class="tag">Downloaded</span>{:else}<button class="btn" hidden={gridDown} disabled={!!busy} onclick={() => download(open, e)}>Download</button>{/if}
-        <RowMenu track={{ id: e.guid, title: e.title, subtitle: open.title, kind: "Podcast", duration_secs: e.duration_secs, path: e.file, url: e.file ? null : e.enclosure_url }} canQueue={false} />
-        <button class="btn" onclick={() => togglePlayed(open, e)}>{e.played ? "Mark unplayed" : "Mark played"}</button>
+        <RowMenu track={{ id: e.guid, title: e.title, subtitle: open.title, kind: "Podcast", duration_secs: e.duration_secs, path: e.file, url: e.file ? null : e.enclosure_url }} canQueue={false} extras={[{ label: e.played ? "Mark unplayed" : "Mark played", run: () => togglePlayed(open, e) }]} />
       </div>
     {/each}
   </div>

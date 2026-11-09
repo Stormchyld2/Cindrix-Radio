@@ -3,8 +3,8 @@
   import type { Track } from "./api";
   import { lists, listActions } from "./playlistStore.svelte";
 
-  let { track, title = track.title, canQueue = true, onQueue, onEdit }:
-    { track: Track; title?: string; canQueue?: boolean; onQueue?: () => void; onEdit?: () => void } = $props();
+  let { track, title = track.title, canQueue = true, onQueue, onEdit, extras = [] }:
+    { track: Track; title?: string; canQueue?: boolean; onQueue?: () => void; onEdit?: () => void; extras?: { label: string; run: () => void }[] } = $props();
 
   let open = $state(false);
   let view = $state<"main" | "lists">("main");
@@ -41,6 +41,7 @@
       {#if canQueue}<button class="it" role="menuitem" onclick={() => { onQueue?.(); close(); }}>Add to queue</button>{/if}
       <button class="it" role="menuitem" onclick={() => guard(() => listActions.toggleFavorite(track), fav ? "Removed from Favorites" : "Added to Favorites")}>{fav ? "♥  Remove from Favorites" : "♡  Add to Favorites"}</button>
       <button class="it" role="menuitem" onclick={() => (view = "lists")}>Add to a playlist…</button>
+      {#each extras as x}<button class="it" role="menuitem" onclick={() => { close(); x.run(); }}>{x.label}</button>{/each}
       {#if onEdit}<button class="it" role="menuitem" onclick={() => { close(); onEdit?.(); }}>Edit title, date and description</button>{/if}
     {:else}
       <div class="list">
