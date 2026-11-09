@@ -8,6 +8,7 @@ const set = (s: PlayerState) => { player.s = s; };
 export const actions = {
   init: async () => set(await api.state()),
   play: async (t: Track) => set(await api.play(t)),
+  playMany: async (ts: Track[]) => set(await api.playMany(ts)),
   playStation: async (st: Station) => set(await api.radioPlay(st)),
   toggle: async () => set(await api.toggle()),
   next: async () => set(await api.next()),

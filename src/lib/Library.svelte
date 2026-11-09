@@ -97,22 +97,26 @@
     });
   });
   async function playBook(b: Book) {
-    await actions.play(toTrack(b.parts[0]));
-    for (const p of b.parts.slice(1)) await actions.enqueue(toTrack(p));
+    await actions.playMany(b.parts.map(toTrack));
   }
   const queueBook = async (b: Book) => { for (const p of b.parts) await actions.enqueue(toTrack(p)); };
   const typing = () => { clearTimeout(timer); timer = setTimeout(refresh, 200); };
 
   const toTrack = (i: LibItem) => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
   const playable = (i: LibItem) => i.kind !== "Video" && i.available;
-  const start = (i: LibItem) => (i.kind === "Video" ? videoActions.open({ title: i.title, file: i.path }) : actions.play(toTrack(i)));
+  // Playing a song also lines up the songs after it in the list, so Next and auto-advance work.
+  const start = (i: LibItem) => {
+    if (i.kind === "Video") return videoActions.open({ title: i.title, file: i.path });
+    const at = items.findIndex((x) => x.id === i.id);
+    const rest = at < 0 ? [] : items.slice(at + 1).filter(playable).slice(0, 99);
+    return actions.playMany([toTrack(i), ...rest.map(toTrack)]);
+  };
   async function shuffle() {
     const p = await api.libSearch(query, kind, genre, artist, album, 2000, 0);
     const pool = p.items.filter(playable);
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     if (!pool.length) return;
-    await actions.play(toTrack(pool[0]));
-    for (const t of pool.slice(1, 40)) await actions.enqueue(toTrack(t));
+    await actions.playMany(pool.slice(0, 100).map(toTrack));
   }
   const fmt = (s: number | null) => (s == null ? "" : s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 </script>

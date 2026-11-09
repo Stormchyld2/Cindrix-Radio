@@ -79,8 +79,12 @@
   // Downloaded episodes play from the phone; the rest stream from the internet (no seeking while streaming).
   const play = async (f: Feed, e: Episode) => {
     message = null;
-    await actions.play({ id: e.guid, title: e.title, subtitle: f.title, kind: "Podcast", duration_secs: e.duration_secs,
-      path: e.file ?? null, url: e.file ? null : e.enclosure_url });
+    const tr = (x: Episode) => ({ id: x.guid, title: x.title, subtitle: f.title, kind: "Podcast" as const, duration_secs: x.duration_secs,
+      path: x.file ?? null, url: x.file ? null : x.enclosure_url });
+    const list = episodesOf(f);
+    const at = list.findIndex((x) => x.guid === e.guid);
+    // the episodes listed after this one play next
+    await actions.playMany([tr(e), ...(at < 0 ? [] : list.slice(at + 1, at + 10).map(tr))]);
   };
   async function playNewest(h: PodHit) {
     const f = await run("Opening the podcast…", () => api.podcastPreview(h.feed_url));

@@ -162,6 +162,23 @@ fn player_play(settings: State<AppSettings>, p: State<Player>, e: State<Engine>,
     s.clone()
 }
 
+/// Play the first track now and line up the rest, replacing whatever was queued before.
+#[tauri::command]
+fn player_play_many(settings: State<AppSettings>, p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>, tracks: Vec<Track>) -> PlayerState {
+    let mut s = p.0.lock().unwrap();
+    let mut it = tracks.into_iter();
+    let Some(first) = it.next() else { return s.clone() };
+    if first.url.is_some() && online_or_err(&settings).is_err() {
+        e.set_error("Grid-Down mode is on, so live streams are off. Switch to Online mode to listen.");
+        return s.clone();
+    }
+    save_outgoing(&h, &lib, &s);
+    s.queue = it.collect();
+    s.play(first);
+    begin(&e, &h, &lib, &mut s);
+    s.clone()
+}
+
 #[tauri::command]
 fn player_toggle(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>) -> PlayerState {
     let mut s = p.0.lock().unwrap();
@@ -175,6 +192,7 @@ fn player_toggle(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib
 #[tauri::command]
 fn player_next(p: State<Player>, e: State<Engine>, h: State<HistoryStore>, lib: State<LibraryStore>) -> PlayerState {
     let mut s = p.0.lock().unwrap();
+    if s.queue.is_empty() { return s.clone(); } // nothing after this track: keep playing it
     save_outgoing(&h, &lib, &s);
     s.next();
     begin(&e, &h, &lib, &mut s);
@@ -594,7 +612,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_folders, player_state, player_play, player_toggle,
+            get_folders, player_state, player_play, player_play_many, player_toggle,
             player_next, player_enqueue, player_volume, player_seek,
             get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,

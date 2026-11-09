@@ -52,7 +52,6 @@ export async function playList(tracks: Track[], shuffle = false) {
   if (shuffle) for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const audio = pool.filter((t) => t.kind !== "Video");
   if (audio.length) {
-    await actions.play(audio[0]);
-    for (const t of audio.slice(1, 100)) await actions.enqueue(t);
+    await actions.playMany(audio.slice(0, 100));
   } else if (pool.length) await startTrack(pool[0]);
 }
