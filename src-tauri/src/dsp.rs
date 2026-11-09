@@ -57,6 +57,12 @@ impl Biquad {
     }
 }
 
+/// Transparent below 0.8; rounds peaks off smoothly instead of hard-clipping them (no crackle or pumping).
+fn soft_limit(x: f32) -> f32 {
+    let a = x.abs();
+    if a <= 0.8 { x } else { x.signum() * (0.8 + 0.2 * ((a - 0.8) / 0.2).tanh()) }
+}
+
 pub struct Equalizer {
     sample_rate: f32,
     channels: usize,
@@ -112,7 +118,7 @@ impl Equalizer {
             for (ch, x) in frame.iter_mut().enumerate() {
                 let mut v = *x * self.preamp;
                 for f in self.filters[ch].iter_mut() { v = f.run(v); }
-                *x = v.clamp(-1.0, 1.0);
+                *x = soft_limit(v);
             }
         }
     }

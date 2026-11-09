@@ -172,7 +172,11 @@
     <label class="vol"><Icon name="vol" size={22} />
       <input type="range" min="0" max="1" step="0.01" value={player.s.volume} aria-label="Volume" oninput={(e) => actions.volume(+e.currentTarget.value)} />
     </label>
-    <button class="hb q" aria-label="Queue and full player" onclick={() => (ui.np = true)}><Icon name="queue" size={26} /></button>
+    <div class="tools">
+      <button class="hb" aria-label="Equalizer" title="Equalizer" onclick={() => navigate("Settings", "Audio & Equalizer")}><Icon name="sliders" size={24} /></button>
+      <button class="hb" aria-label="Car mode" title="Car mode" onclick={() => { ui.car = true; ui.np = true; }}><Icon name="car" size={24} /></button>
+      <button class="hb" aria-label="Queue, sleep timer and full player" title="Queue and sleep timer" onclick={() => (ui.np = true)}><Icon name="queue" size={24} /></button>
+    </div>
   </footer>
 </div>
 
@@ -198,6 +202,7 @@
   .ring{width:64px;height:64px;border-radius:32px;border:3px solid var(--blue);background:#0A0E13;color:#fff;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 16px #1fa8ff55}
   .seekline{position:absolute;left:0;right:0;top:-9px;width:100%;margin:0;height:18px;opacity:.9}
   .vol{display:flex;gap:8px;align-items:center;color:var(--silver)}.vol input{width:140px}
+  .tools{display:flex;gap:2px;align-items:center}
   .burger,.scrim{display:none}
   @media (max-width:800px){
     .shell{grid-template-columns:1fr;grid-template-rows:56px 1fr auto}
@@ -215,7 +220,8 @@
     .np{width:auto;flex:1 1 55%}.thumb{width:44px;height:44px}
     .tx{gap:10px;margin:0}
     .ring{width:52px;height:52px}
-    .vol{display:none}.q{display:none}
+    .vol{display:none}
+    .tools{margin-left:auto}
     .seekline{top:-9px}
   }
 </style>

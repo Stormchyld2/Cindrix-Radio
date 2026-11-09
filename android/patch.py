@@ -43,7 +43,7 @@ t = re.sub(r"^android \{", "android {\n    packaging { jniLibs { useLegacyPackag
 t = t.replace("targetSdk = 37", "targetSdk = 35")
 t = t.replace('manifestPlaceholders["usesCleartextTraffic"] = "false"', 'manifestPlaceholders["usesCleartextTraffic"] = "true"')
 t = t.replace("enable = true", "enable = false")
-t += '\ndependencies {\n    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")\n}\n'
+t += '\ndependencies {\n    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")\n    implementation("commons-io:commons-io:2.5")\n}\nconfigurations.all { resolutionStrategy { force("commons-io:commons-io:2.5") } }\n'
 g.write_text(t)
 
 # keep the classes Rust calls by name (JNI) and the yt-dlp library from being stripped in release builds
