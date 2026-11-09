@@ -4,6 +4,10 @@ package app.cindrix.radio
  *  comes back as readable text (with the whole cause chain) instead of a bare class name. */
 object YtBridge {
   private fun <T> guard(f: () -> T): T {
+    // Rust calls us from a thread it attached itself; such threads have no context class loader,
+    // which the helper's libraries (commons-io, jackson) look up. Give it the app's.
+    val t0 = Thread.currentThread()
+    if (t0.contextClassLoader == null) t0.contextClassLoader = YtBridge::class.java.classLoader
     try {
       return f()
     } catch (t: Throwable) {
