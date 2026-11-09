@@ -50,7 +50,9 @@
 
 <div class="stats">
   <button class="stat" onclick={() => go("Library", "Music")}><span class="ic"><Icon name="db" size={34} /></span><div><b>Library</b><span>{counts.music.toLocaleString()} Tracks</span></div></button>
+  {#if !store.s?.grid_down}
   <button class="stat" onclick={() => go("Radio")}><span class="ic"><Icon name="radio" size={34} /></span><div><b>Radio</b><span>{stations.toLocaleString()} Stations</span></div></button>
+  {/if}
   <button class="stat" onclick={() => go("Library", "Music")}><span class="ic"><Icon name="download" size={34} /></span><div><b>Downloads</b><span>{downloads.toLocaleString()} Items</span></div></button>
 </div>
 
@@ -78,7 +80,7 @@
   <div class="tools">
     <button onclick={() => go("Settings", "Audio & Equalizer")}><Icon name="sliders" size={34} />Equalizer</button>
     <button onclick={() => go("Karaoke")}><Icon name="karaoke" size={34} />Karaoke</button>
-    <button onclick={() => go("Radio")}><span class="redot"><Icon name="rec" size={34} /></span>Record</button>
+{#if !store.s?.grid_down}    <button onclick={() => go("Radio")}><span class="redot"><Icon name="rec" size={34} /></span>Record</button>{/if}
     <button onclick={() => go("Settings", "LAN & Sharing")}><Icon name="share" size={34} />AirLink</button>
   </div>
 </section>

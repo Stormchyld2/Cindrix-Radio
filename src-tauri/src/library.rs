@@ -90,7 +90,10 @@ pub fn classify(path: &Path, root: &Path, kinds: &[Kind]) -> Option<Kind> {
 }
 
 fn skip_dir(name: &str) -> bool {
+    // phone system sounds (ringtones, notification and alarm tones) are not music
+    let low = name.to_ascii_lowercase();
     name.starts_with('.') || name == "$RECYCLE.BIN" || name == "System Volume Information"
+        || matches!(low.as_str(), "ringtones" | "notifications" | "alarms" | "ringtone" | "notification" | "alarm" | "ui" | "audiobooks_samples")
 }
 
 fn walk(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
@@ -131,6 +134,8 @@ fn scan_source(src: &Source) -> Vec<Item> {
     for f in files {
         let Some(kind) = classify(&f, root, &src.kinds) else { continue };
         let tags = if kind == Kind::Video { Tags::default() } else { read_tags(&f) };
+        // clips under 20 seconds are ringtones and sound effects, not songs
+        if kind == Kind::Music && tags.secs.map_or(false, |s| s < 20) { continue; }
         let stem = f.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let rel = f.strip_prefix(root).unwrap_or(&f);
         let comps: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();

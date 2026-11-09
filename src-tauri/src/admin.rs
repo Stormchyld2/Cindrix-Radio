@@ -7,31 +7,49 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{Manager, State};
 
-fn dir_size(p: &Path) -> u64 {
+#[allow(dead_code)]
+fn dir_size(p: &Path) -> u64 { dir_stats(p).0 }
+
+/// (bytes, files) under a folder.
+fn dir_stats(p: &Path) -> (u64, u64) {
     let mut total = 0;
+    let mut files = 0;
     let mut stack = vec![p.to_path_buf()];
     while let Some(d) = stack.pop() {
         let Ok(rd) = std::fs::read_dir(&d) else { continue };
         for e in rd.flatten() {
             match e.metadata() {
                 Ok(m) if m.is_dir() => stack.push(e.path()),
-                Ok(m) => total += m.len(),
+                Ok(m) => { total += m.len(); files += 1; }
                 Err(_) => {}
             }
         }
     }
-    total
+    (total, files)
 }
 
 #[derive(Serialize)]
-pub struct StorageRow { pub label: String, pub path: String, pub bytes: u64 }
+pub struct StorageRow { pub label: String, pub path: String, pub bytes: u64, pub files: u64, pub exists: bool }
+
+#[derive(Serialize)]
+pub struct StorageReport { pub rows: Vec<StorageRow>, pub free: u64, pub total: u64, pub root_exists: bool }
 
 #[tauri::command]
-pub async fn storage_report() -> Result<Vec<StorageRow>, String> {
+pub async fn storage_report() -> Result<StorageReport, String> {
     blocking_pub(|| {
         let f = paths::default_folders();
         let rows = [("Music", f.music), ("Podcasts", f.podcasts), ("Audiobooks", f.audiobooks), ("Videos", f.videos), ("Radio & recordings", f.radio)];
-        Ok(rows.into_iter().map(|(l, p)| { let bytes = dir_size(Path::new(&p)); StorageRow { label: l.into(), path: p, bytes } }).collect())
+        let rows = rows.into_iter().map(|(l, p)| {
+            let exists = Path::new(&p).is_dir();
+            let (bytes, files) = dir_stats(Path::new(&p));
+            StorageRow { label: l.into(), path: p, bytes, files, exists }
+        }).collect();
+        // free and total space on the drive that holds the save folder (or its nearest existing parent)
+        let mut probe = std::path::PathBuf::from(&f.root);
+        while !probe.exists() && probe.pop() {}
+        let free = fs2::available_space(&probe).unwrap_or(0);
+        let total = fs2::total_space(&probe).unwrap_or(0);
+        Ok(StorageReport { rows, free, total, root_exists: Path::new(&f.root).is_dir() })
     }).await
 }
 

@@ -59,11 +59,11 @@
   const mmss = (s: number) => `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ":" : ""}${String(Math.floor((s % 3600) / 60)).padStart(Math.floor(s / 3600) ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   // Side menu, in the order of the design. `tab` is the screen, `arg` picks a sub-view.
-  type NavItem = { id: string; label: string; icon: string; tab: string; arg?: string; car?: boolean };
+  type NavItem = { id: string; label: string; icon: string; tab: string; arg?: string; car?: boolean; online?: boolean };
   const nav: NavItem[] = [
     { id: "home", label: "Home", icon: "home", tab: "Dashboard" },
     { id: "music", label: "Music", icon: "music", tab: "Library", arg: "Music" },
-    { id: "radio", label: "Radio", icon: "radio", tab: "Radio" },
+    { id: "radio", label: "Radio", icon: "radio", tab: "Radio", online: true },
     { id: "podcasts", label: "Podcasts", icon: "podcast", tab: "Podcasts" },
     { id: "audiobooks", label: "Audiobooks", icon: "book", tab: "Library", arg: "Audiobook" },
     { id: "videos", label: "Videos", icon: "video", tab: "Videos" },
@@ -74,6 +74,8 @@
     { id: "airlink", label: "AirLink", icon: "share", tab: "Settings", arg: "LAN & Sharing" },
     { id: "car", label: "Car Mode", icon: "car", tab: "Dashboard", car: true },
   ];
+  // Grid-Down hides what only works with internet; going back Online shows it again
+  const visibleNav = $derived(nav.filter((n) => !(store.s?.grid_down && n.online)));
   let active = $state("Dashboard");
   let activeId = $state("home");
   let libKind = $state<"Music" | "Audiobook">("Music");
@@ -89,6 +91,7 @@
     if (n.car) { ui.car = true; ui.np = true; menu = false; return; }
     navigate(n.tab, n.arg, n.id);
   }
+  $effect(() => { if (store.s?.grid_down && active === "Radio") navigate("Dashboard"); });
   const back = $derived(store.s?.prefs.skip_back ?? 15);
   const heading = $derived(active === "Dashboard" ? "Home" : active === "Library" ? (libKind === "Audiobook" ? "Audiobooks" : "Music") : active);
   // keep the position and queue in step with the audio engine
@@ -120,7 +123,7 @@
   </header>
   {#if menu}<button class="scrim" aria-label="Close menu" onclick={() => (menu = false)}></button>{/if}
   <nav class:open={menu}>
-    {#each nav as n}
+    {#each visibleNav as n}
       <button class="navbtn" class:on={activeId === n.id} onclick={() => pickNav(n)}><Icon name={n.icon} size={24} />{n.label}</button>
     {/each}
   </nav>

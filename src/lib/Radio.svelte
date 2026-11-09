@@ -203,7 +203,7 @@
   .status{font-size:13px;color:var(--lblue);margin:4px 0}.status.err{color:var(--red)}
   .sec{margin:18px 0 8px;font-size:18px}.sec span{font-size:12px;color:var(--muted);margin-left:6px;font-family:Inter,sans-serif}
   .note{font-size:13px;color:var(--muted);margin:6px 0}.note.small{font-size:11px;margin-top:18px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:10px}
+  .grid{display:flex;flex-direction:column;gap:8px}
   .grid>*{min-width:0}
   .st{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;box-sizing:border-box;height:68px;padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
   .st.on{border-color:var(--blue);background:#1FA8FF0F}
