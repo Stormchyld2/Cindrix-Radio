@@ -11,6 +11,8 @@ export interface Settings { lyrics_viewer: boolean; terms_version: string | null
 export interface StorageRow { label: string; path: string; bytes: number; files: number; exists: boolean }
 export interface StorageReport { rows: StorageRow[]; free: number; total: number; root_exists: boolean }
 export interface BookHit { id: string; title: string; author: string; runtime: string }
+export interface HubTrack { rel: string; title: string; artist: string; album: string; genre: string; ext: string; convert: boolean }
+export interface HubFolder { name: string; sub: string; folder: string; count: number }
 export interface BackupInfo { name: string; bytes: number; made: number }
 export interface Diagnostics { version: string; os: string; arch: string; data_dir: string; save_root: string; library_items: number; private_build: boolean }
 
@@ -50,6 +52,14 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_d
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  hubStatus: () => call<string | null>("hub_status", {}, () => null),
+  hubConnect: (addr: string, pin: string) => call<string>("hub_connect", { addr, pin }, () => { throw new Error("Open the app on your phone or PC to connect to a Hub."); }),
+  hubDisconnect: () => call<void>("hub_disconnect", {}, () => undefined),
+  hubQuery: (text: string, folder: string | null, direct: boolean, offset: number) => call<{ total: number; tracks: HubTrack[] }>("hub_query", { text, folder, direct, offset }, () => ({ total: 0, tracks: [] })),
+  hubFolders: (prefix: string | null) => call<HubFolder[]>("hub_folders", { prefix }, () => []),
+  hubFetch: (rel: string, keep: boolean) => call<string>("hub_fetch", { rel, keep }, () => ""),
+  hubSaveFolder: (folder: string) => call<number>("hub_save_folder", { folder }, () => 0),
+  hubProgress: () => call<[number, number]>("hub_progress", {}, () => [0, 0]),
   podcastPreview: (url: string) => call<Feed>("podcast_preview", { url }, desktopOnly),
   podcastSearch: (q: string) => call<PodHit[]>("podcast_search", { q }, () => []),
   audiobookSearch: (q: string) => call<BookHit[]>("audiobook_search", { q }, () => []),

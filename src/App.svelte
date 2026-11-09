@@ -7,6 +7,7 @@
   import Library from "./lib/Library.svelte";
   import Radio from "./lib/Radio.svelte";
   import Videos from "./lib/Videos.svelte";
+  import HubView from "./lib/HubView.svelte";
   import Playlists from "./lib/Playlists.svelte";
   import Favorites from "./lib/Favorites.svelte";
   import VideoPlayer from "./lib/VideoPlayer.svelte";
@@ -70,6 +71,7 @@
     { id: "playlists", label: "Playlists", icon: "list", tab: "Playlists" },
     { id: "favorites", label: "Favorites", icon: "star", tab: "Favorites" },
     { id: "tools", label: "Audio Tools", icon: "sliders", tab: "Settings", arg: "Audio & Equalizer" },
+    { id: "hub", label: "Cindrix Hub", icon: "share", tab: "Hub" },
     { id: "airlink", label: "AirLink", icon: "share", tab: "Settings", arg: "LAN & Sharing" },
     { id: "car", label: "Car Mode", icon: "car", tab: "Dashboard", car: true },
   ];
@@ -106,7 +108,7 @@
   }
   $effect(() => { if (store.s?.grid_down && ["Radio", "Podcasts", "Videos"].includes(active)) navigate("Library", "Music"); });
   const back = $derived(store.s?.prefs.skip_back ?? 15);
-  const heading = $derived(active === "Dashboard" ? "Home" : active === "Library" ? (libKind === "Audiobook" ? "Audiobooks" : "Music") : active);
+  const heading = $derived(active === "Dashboard" ? "Home" : active === "Hub" ? "Cindrix Hub" : active === "Library" ? (libKind === "Audiobook" ? "Audiobooks" : "Music") : active);
   // keep the position and queue in step with the audio engine
   onMount(() => {
     const id = setInterval(async () => { await actions.init(); noteListening(player.s.current, player.s.position_secs, player.s.playing); }, 500);
@@ -152,6 +154,8 @@
       <Playlists />
     {:else if active === "Favorites"}
       <Favorites />
+    {:else if active === "Hub"}
+      <HubView />
     {:else if active === "Library"}
       {#key libKind}<Library initial={libKind} />{/key}
     {:else if active === "Podcasts"}

@@ -6,6 +6,7 @@ mod dsp;
 mod engine;
 mod history;
 mod hls;
+mod hub;
 mod library;
 mod lyrics;
 mod meta;
@@ -281,6 +282,51 @@ pub(crate) async fn blocking_pub<T: Send + 'static>(f: impl FnOnce() -> Blocking
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Blocking<T> + Send + 'static) -> Blocking<T> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
+}
+
+// ---- Cindrix Ops Hub / Vault (music on its drives, over the local network) ----
+#[tauri::command]
+fn hub_status() -> Option<String> { hub::status() }
+
+#[tauri::command]
+fn hub_disconnect() { hub::disconnect() }
+
+#[tauri::command]
+fn hub_progress() -> (usize, usize) { hub::progress() }
+
+#[tauri::command]
+async fn hub_connect(addr: String, pin: String) -> Result<String, String> { blocking(move || hub::connect(&addr, &pin)).await }
+
+#[tauri::command]
+async fn hub_query(text: String, folder: Option<String>, direct: bool, offset: usize) -> Result<serde_json::Value, String> {
+    blocking(move || hub::query(&text, folder.as_deref(), direct, offset, 200)).await
+}
+
+#[tauri::command]
+async fn hub_folders(prefix: Option<String>) -> Result<serde_json::Value, String> { blocking(move || hub::folders(prefix.as_deref())).await }
+
+/// Copy one song from the Hub and return its local path. `keep` saves it in the music library;
+/// otherwise it goes in a hidden cache folder and is only for listening now.
+#[tauri::command]
+async fn hub_fetch(rel: String, keep: bool) -> Result<String, String> {
+    blocking(move || {
+        let f = paths::default_folders();
+        let dest = if keep { std::path::PathBuf::from(&f.music).join(hub::local_name(&rel)) }
+                   else { std::path::PathBuf::from(&f.root).join(".hub-cache").join(hub::local_name(&rel)) };
+        hub::fetch(&rel, &dest).map(|p| p.to_string_lossy().into_owned())
+    }).await
+}
+
+/// Copy a whole folder of songs from the Hub into the music library.
+#[tauri::command]
+async fn hub_save_folder(lib: State<'_, LibraryStore>, folder: String) -> Result<usize, String> {
+    let lib = lib.inner().clone();
+    blocking(move || {
+        let root = std::path::PathBuf::from(paths::default_folders().music);
+        let n = hub::save_folder(&folder, &root)?;
+        let _ = lib.scan(Some("downloads"));
+        Ok(n)
+    }).await
 }
 
 #[tauri::command]
@@ -605,6 +651,7 @@ pub fn run() {
             app.manage(lib);
             app.manage(LyricsStore::load(dir.join("lyrics.json")));
             app.manage(PlaylistStore::load(std::path::PathBuf::from(&folders.root).join("Playlists").join("playlists.json")));
+            hub::init(dir.join("hub.json"));
             app.manage(PodStore::load(dir.join("podcasts.json")));
             app.manage(AppSettings { inner: Mutex::new(loaded), path });
             #[cfg(target_os = "android")]
@@ -616,7 +663,7 @@ pub fn run() {
             player_next, player_enqueue, player_volume, player_seek,
             get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
-            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, audiobook_progress, podcast_search, podcast_preview,
+            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, audiobook_progress, podcast_search, hub_status, hub_disconnect, hub_progress, hub_connect, hub_query, hub_folders, hub_fetch, hub_save_folder, podcast_preview,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
