@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type AlbumRow, type Counts, type Kind, type LibItem } from "./api";
+  import { api, type AlbumRow, type BookHit, type Counts, type Kind, type LibItem } from "./api";
+  import { store } from "./settings.svelte";
   import { actions } from "./player.svelte";
   import { videoActions } from "./video.svelte";
   import RowMenu from "./RowMenu.svelte";
@@ -55,6 +56,25 @@
   const openArtist = (a: string) => { artist = a; album = null; view = "songs"; refresh(); };
   const openAlbum = (a: AlbumRow) => { artist = a.artist || null; album = a.album; view = "songs"; refresh(); };
   const openGenre = (g: string | null) => { genre = g; view = "songs"; refresh(); };
+  // ---- find free audiobooks online (public domain, LibriVox)
+  let bq = $state("");
+  let books = $state<BookHit[]>([]);
+  let bBusy = $state<string | null>(null);
+  let bMsg = $state<string | null>(null);
+  let saved = $state<Set<string>>(new Set());
+  async function findBooks() {
+    if (!bq.trim()) return;
+    bBusy = "Searching…"; bMsg = null; books = [];
+    try { books = await api.audiobookSearch(bq); if (!books.length) bMsg = "No free audiobooks matched. Try a shorter title or the author's name."; }
+    catch (e) { bMsg = String(e instanceof Error ? e.message : e); }
+    bBusy = null;
+  }
+  async function getBook(b: BookHit) {
+    bBusy = `Downloading "${b.title}"… this can take several minutes. You can keep using the app.`; bMsg = null;
+    try { const n = await api.audiobookDownload(b.id, b.title); saved = new Set([...saved, b.id]); bMsg = `Saved ${n} chapters. Find it under Audiobooks.`; await refresh(); }
+    catch (e) { bMsg = String(e instanceof Error ? e.message : e); }
+    bBusy = null;
+  }
   const typing = () => { clearTimeout(timer); timer = setTimeout(refresh, 200); };
 
   const toTrack = (i: LibItem) => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
@@ -77,7 +97,29 @@
   {/each}
 </div>
 
-<input class="search" placeholder="Search {kind === 'Music' ? 'songs, artists, albums, genres' : 'titles'}…" bind:value={query} oninput={typing} />
+<form class="sbar" onsubmit={(e) => { e.preventDefault(); clearTimeout(timer); refresh(); }}>
+  <input class="search" type="search" enterkeyhint="search" placeholder="Search {kind === 'Music' ? 'songs, artists, albums, genres' : 'titles'}…" bind:value={query} oninput={typing} />
+  <button class="btn primary" type="submit">Search</button>
+</form>
+
+{#if kind === "Audiobook" && !store.s?.grid_down}
+  <div class="find">
+    <b>Find free audiobooks online</b>
+    <span class="note">Public-domain books from LibriVox. They download to your phone and play offline.</span>
+    <form class="sbar" onsubmit={(e) => { e.preventDefault(); findBooks(); }}>
+      <input class="search" type="search" enterkeyhint="search" placeholder="Book title or author…" bind:value={bq} />
+      <button class="btn primary" type="submit" disabled={!bq.trim() || !!bBusy}>Find</button>
+    </form>
+    {#if bBusy}<p class="note">{bBusy}</p>{/if}
+    {#if bMsg}<p class="note">{bMsg}</p>{/if}
+    {#each books as b (b.id)}
+      <div class="book">
+        <div class="bm"><b>{b.title}</b><span>{b.author}{b.runtime ? ` · ${b.runtime}` : ""}</span></div>
+        <button class="btn" disabled={!!bBusy || saved.has(b.id)} onclick={() => getBook(b)}>{saved.has(b.id) ? "Saved ✓" : "Download"}</button>
+      </div>
+    {/each}
+  </div>
+{/if}
 
 {#if kind === "Music"}
   <div class="genres">
@@ -164,7 +206,12 @@
   .types{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
   .type.on,.chip.on{border-color:var(--blue);color:var(--lblue);background:#1FA8FF14}
   .type b{margin-left:6px;color:var(--muted);font-weight:500}
-  .search{width:100%;height:44px;border-radius:12px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 14px;font-size:15px}
+  .sbar{display:flex;gap:8px;align-items:center;margin:8px 0}
+  .find{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:12px 14px;margin:10px 0;display:flex;flex-direction:column;gap:6px}
+  .find .note{font-size:12px;color:var(--muted);margin:0}
+  .book{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+  .bm{flex:1;min-width:0;display:flex;flex-direction:column}.bm b{overflow-wrap:anywhere}.bm span{font-size:12px;color:var(--muted)}
+  .search{flex:1;min-width:0;width:100%;height:44px;border-radius:12px;border:1px solid #2A3747;background:#0D1620;color:var(--silver);padding:0 14px;font-size:15px}
   .genres{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
   .chip{height:30px;padding:0 12px;border-radius:15px;border:1px solid #2A3747;background:transparent;color:var(--silver);font-size:12px}
   .chip span{color:var(--muted);margin-left:4px}

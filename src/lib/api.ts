@@ -10,6 +10,7 @@ export interface Prefs { text_scale: number; accent: string; high_contrast: bool
 export interface Settings { lyrics_viewer: boolean; terms_version: string | null; eq: EqSettings; grid_down: boolean; pause_on_disconnect: boolean; prefs: Prefs; download_root: string | null }
 export interface StorageRow { label: string; path: string; bytes: number; files: number; exists: boolean }
 export interface StorageReport { rows: StorageRow[]; free: number; total: number; root_exists: boolean }
+export interface BookHit { id: string; title: string; author: string; runtime: string }
 export interface BackupInfo { name: string; bytes: number; made: number }
 export interface Diagnostics { version: string; os: string; arch: string; data_dir: string; save_root: string; library_items: number; private_build: boolean }
 
@@ -48,6 +49,8 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_d
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  audiobookSearch: (q: string) => call<BookHit[]>("audiobook_search", { q }, () => []),
+  audiobookDownload: (id: string, title: string) => call<number>("audiobook_download", { id, title }, () => 0),
   storageReport: () => call<StorageReport>("storage_report", {}, () => ({ rows: [], free: 0, total: 0, root_exists: false })),
   setPrefs: (prefs: Prefs) => call<Settings>("set_prefs", { prefs }, () => (mockSettings = { ...mockSettings, prefs })),
   setPauseOnDisconnect: (on: boolean) => call<Settings>("set_pause_on_disconnect", { on }, () => (mockSettings = { ...mockSettings, pause_on_disconnect: on })),

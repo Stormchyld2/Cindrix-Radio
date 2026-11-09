@@ -1,6 +1,7 @@
 #[cfg(target_os = "android")]
 mod android;
 mod admin;
+mod audiobooks;
 mod dsp;
 mod engine;
 mod history;
@@ -262,6 +263,25 @@ pub(crate) async fn blocking_pub<T: Send + 'static>(f: impl FnOnce() -> Blocking
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Blocking<T> + Send + 'static) -> Blocking<T> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn audiobook_search(settings: State<'_, AppSettings>, q: String) -> Result<Vec<audiobooks::BookHit>, String> {
+    online_or_err(&settings)?;
+    blocking(move || audiobooks::search(&q)).await
+}
+
+/// Save a whole book (all chapters) into Downloads/Cindrix/Audiobooks and add it to the library.
+#[tauri::command]
+async fn audiobook_download(settings: State<'_, AppSettings>, lib: State<'_, LibraryStore>, id: String, title: String) -> Result<usize, String> {
+    online_or_err(&settings)?;
+    let lib = lib.inner().clone();
+    blocking(move || {
+        let root = std::path::PathBuf::from(paths::default_folders().audiobooks);
+        let (_, n) = audiobooks::download(&root, &id, &title)?;
+        let _ = lib.scan(Some("downloads"));
+        Ok(n)
+    }).await
 }
 
 #[tauri::command]
@@ -561,7 +581,7 @@ pub fn run() {
             player_next, player_enqueue, player_volume, player_seek,
             get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
-            podcast_download, podcast_mark_played,
+            podcast_download, podcast_mark_played, audiobook_search, audiobook_download,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
