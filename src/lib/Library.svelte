@@ -3,7 +3,7 @@
   import { api, type AlbumRow, type Counts, type Kind, type LibItem } from "./api";
   import { actions } from "./player.svelte";
   import { videoActions } from "./video.svelte";
-  import AddMenu from "./AddMenu.svelte";
+  import RowMenu from "./RowMenu.svelte";
 
   const types: { kind: Kind; label: string; key: keyof Counts }[] = [
     { kind: "Music", label: "Music", key: "music" },
@@ -135,9 +135,7 @@
         <div class="meta"><b>{i.title}</b><span>{[i.artist || i.group, i.album].filter(Boolean).join(" · ")}</span></div>
         {#if !i.available}<span class="tag">Unavailable</span>{/if}
         <span class="time">{fmt(i.duration_secs)}</span>
-        <AddMenu track={toTrack(i)} />
-        {#if inTauri}<button class="ic" title="Edit title, date and description" aria-label="Edit details for {i.title}" disabled={!i.available} onclick={() => startEdit(i)}>✎</button>{/if}
-        <button class="btn" disabled={!playable(i)} onclick={() => actions.enqueue(toTrack(i))}>+ Queue</button>
+        <RowMenu track={toTrack(i)} canQueue={playable(i)} onQueue={() => actions.enqueue(toTrack(i))} onEdit={inTauri && i.available ? () => startEdit(i) : undefined} />
       </div>
     {/each}
   </div>
@@ -178,7 +176,7 @@
   .row.off{opacity:.55}
   .play{width:36px;height:36px;border-radius:18px;border:0;background:var(--blue);color:#04121C;flex:none}
   .play:disabled{background:#2A3747;color:var(--muted);cursor:not-allowed}
-  .meta{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.meta b,.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.meta b{display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;color:#F1F4F8;font-size:14px}.meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .meta span,.time{color:var(--muted);font-size:12px}
   .tag{font-size:12px;color:var(--muted)}
   .ic{width:32px;height:32px;border:0;background:transparent;color:var(--muted);font-size:16px;border-radius:8px}
