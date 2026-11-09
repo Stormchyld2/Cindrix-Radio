@@ -376,7 +376,7 @@ impl Engine {
                 if playing && sink.empty() {
                     trace(format!("output empty at position {}s", s.position_secs));
                     playing = false;
-                    if is_stream { s.error = Some("The stream stopped. The station may have gone offline.".into()); }
+                    if is_stream { s.error = Some("The stream stopped or finished. A radio station may have gone offline.".into()); }
                     else { en.store(true, Ordering::SeqCst); }
                 }
                 s.ended = en.load(Ordering::SeqCst);

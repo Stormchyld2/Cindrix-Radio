@@ -271,6 +271,13 @@ async fn podcast_search(settings: State<'_, AppSettings>, q: String) -> Result<V
     blocking(move || podcasts::search(&q)).await
 }
 
+/// Read a feed without subscribing, so its newest episode can be played straight away.
+#[tauri::command]
+async fn podcast_preview(settings: State<'_, AppSettings>, url: String) -> Result<podcasts::Feed, String> {
+    online_or_err(&settings)?;
+    blocking(move || podcasts::fetch_feed(&url)).await
+}
+
 #[tauri::command]
 async fn audiobook_search(settings: State<'_, AppSettings>, q: String) -> Result<Vec<audiobooks::BookHit>, String> {
     online_or_err(&settings)?;
@@ -587,7 +594,7 @@ pub fn run() {
             player_next, player_enqueue, player_volume, player_seek,
             get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
-            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, podcast_search,
+            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, podcast_search, podcast_preview,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,

@@ -76,10 +76,18 @@
     const r = await run("Saving…", () => api.podcastMarkPlayed(f.id, e.guid, !e.played));
     if (r) feeds = r;
   };
+  // Downloaded episodes play from the phone; the rest stream from the internet (no seeking while streaming).
   const play = async (f: Feed, e: Episode) => {
-    if (!e.file) return;
-    await actions.play({ id: e.guid, title: e.title, subtitle: f.title, kind: "Podcast", duration_secs: e.duration_secs, path: e.file });
+    message = null;
+    await actions.play({ id: e.guid, title: e.title, subtitle: f.title, kind: "Podcast", duration_secs: e.duration_secs,
+      path: e.file ?? null, url: e.file ? null : e.enclosure_url });
   };
+  async function playNewest(h: PodHit) {
+    const f = await run("Opening the podcast…", () => api.podcastPreview(h.feed_url));
+    const e = f?.episodes[0];
+    if (!f || !e) { if (f) message = "That podcast has no episodes yet."; return; }
+    await play({ ...f, title: f.title || h.name }, e);
+  }
   const fmt = (s: number | null) => (s == null ? "" : `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ":" : ""}${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`);
   const unplayed = (f: Feed) => f.episodes.filter((e) => !e.played).length;
 </script>
@@ -108,9 +116,10 @@
         <div class="hit card">
           {#if h.image}<img src={h.image} alt="" />{:else}<div class="ph s">{h.name.slice(0, 2).toUpperCase()}</div>{/if}
           <div class="hm"><b>{h.name}</b><span>{h.author}{h.genre ? ` · ${h.genre}` : ""}</span></div>
-          {#if subscribed(h)}<span class="tag">Subscribed ✓</span>
-          {:else}<div class="ha"><button class="btn primary" disabled={!!busy} onclick={() => subscribe(h)}>Subscribe</button>
-            <button class="btn" disabled={!!busy} onclick={() => subscribe(h, true)}>Subscribe + newest ⬇</button></div>{/if}
+          {#if subscribed(h)}<div class="ha"><span class="tag">Subscribed ✓</span><button class="btn primary" disabled={!!busy} onclick={() => playNewest(h)}>▶ Play newest</button></div>
+          {:else}<div class="ha"><button class="btn primary" disabled={!!busy} onclick={() => playNewest(h)}>▶ Play newest</button>
+            <button class="btn" disabled={!!busy} onclick={() => subscribe(h)}>Subscribe</button>
+            <button class="btn" disabled={!!busy} onclick={() => subscribe(h, true)}>Subscribe + ⬇</button></div>{/if}
         </div>
       {/each}
     </div>
@@ -141,7 +150,7 @@
   <div class="eps">
     {#each episodesOf(open) as e (e.guid)}
       <div class="ep" class:done={e.played}>
-        <button class="play" disabled={!e.file} title={e.file ? "Play" : "Download to play"} aria-label="Play {e.title}" onclick={() => play(open, e)}>▶</button>
+        <button class="play" title={e.file ? "Play" : "Stream (uses data). Download to keep it."} aria-label="Play {e.title}" onclick={() => play(open, e)}>▶</button>
         <div class="meta"><b>{e.title}</b><span>{e.published ?? ""} {fmt(e.duration_secs)}</span></div>
         {#if e.file}<span class="tag">Downloaded</span>{/if}
         <RowMenu track={{ id: e.guid, title: e.title, subtitle: open.title, kind: "Podcast", duration_secs: e.duration_secs, path: e.file, url: e.file ? null : e.enclosure_url }} canQueue={false} extras={[...(!e.file && !gridDown ? [{ label: "Download", run: () => download(open, e) }] : []), { label: e.played ? "Mark unplayed" : "Mark played", run: () => togglePlayed(open, e) }]} />

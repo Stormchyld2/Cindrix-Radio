@@ -50,6 +50,7 @@ let mockSettings: Settings = { lyrics_viewer: false, terms_version: null, grid_d
 const desktopOnly = (): never => { throw new Error("Podcasts work in the desktop app, not in the browser preview."); };
 
 export const api = {
+  podcastPreview: (url: string) => call<Feed>("podcast_preview", { url }, desktopOnly),
   podcastSearch: (q: string) => call<PodHit[]>("podcast_search", { q }, () => []),
   audiobookSearch: (q: string) => call<BookHit[]>("audiobook_search", { q }, () => []),
   audiobookDownload: (id: string, title: string) => call<number>("audiobook_download", { id, title }, () => 0),
