@@ -53,6 +53,7 @@ export const api = {
   podcastPreview: (url: string) => call<Feed>("podcast_preview", { url }, desktopOnly),
   podcastSearch: (q: string) => call<PodHit[]>("podcast_search", { q }, () => []),
   audiobookSearch: (q: string) => call<BookHit[]>("audiobook_search", { q }, () => []),
+  audiobookProgress: () => call<[number, number]>("audiobook_progress", {}, () => [0, 0]),
   audiobookDownload: (id: string, title: string) => call<number>("audiobook_download", { id, title }, () => 0),
   storageReport: () => call<StorageReport>("storage_report", {}, () => ({ rows: [], free: 0, total: 0, root_exists: false })),
   setPrefs: (prefs: Prefs) => call<Settings>("set_prefs", { prefs }, () => (mockSettings = { ...mockSettings, prefs })),

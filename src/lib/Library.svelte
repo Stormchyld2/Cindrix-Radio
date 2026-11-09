@@ -62,6 +62,7 @@
   let bBusy = $state<string | null>(null);
   let bMsg = $state<string | null>(null);
   let saved = $state<Set<string>>(new Set());
+  let getting = $state<string | null>(null);
   async function findBooks() {
     if (!bq.trim()) return;
     bBusy = "Searching…"; bMsg = null; books = [];
@@ -70,10 +71,15 @@
     bBusy = null;
   }
   async function getBook(b: BookHit) {
-    bBusy = `Downloading "${b.title}"… this can take several minutes. You can keep using the app.`; bMsg = null;
-    try { const n = await api.audiobookDownload(b.id, b.title); saved = new Set([...saved, b.id]); bMsg = `Saved ${n} chapters. Find it under Audiobooks.`; await refresh(); }
+    getting = b.id; bMsg = null;
+    bBusy = `Downloading "${b.title}"… starting`;
+    const poll = setInterval(async () => {
+      try { const [d, t] = await api.audiobookProgress(); if (t) bBusy = `Downloading "${b.title}": part ${Math.min(d + 1, t)} of ${t}. You can keep using the app.`; } catch { /* ignore */ }
+    }, 1000);
+    try { const n = await api.audiobookDownload(b.id, b.title); saved = new Set([...saved, b.id]); bMsg = `Saved "${b.title}" as one file (${n} chapters joined). Find it under Audiobooks.`; await refresh(); }
     catch (e) { bMsg = String(e instanceof Error ? e.message : e); }
-    bBusy = null;
+    clearInterval(poll);
+    getting = null; bBusy = null;
   }
   const typing = () => { clearTimeout(timer); timer = setTimeout(refresh, 200); };
 
@@ -115,7 +121,7 @@
     {#each books as b (b.id)}
       <div class="book">
         <div class="bm"><b>{b.title}</b><span>{b.author}{b.runtime ? ` · ${b.runtime}` : ""}</span></div>
-        <button class="btn" disabled={!!bBusy || saved.has(b.id)} onclick={() => getBook(b)}>{saved.has(b.id) ? "Saved ✓" : "Download"}</button>
+        <button class="btn" disabled={!!bBusy || saved.has(b.id)} onclick={() => getBook(b)}>{saved.has(b.id) ? "Saved ✓" : getting === b.id ? "Downloading…" : "Download"}</button>
       </div>
     {/each}
   </div>

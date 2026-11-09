@@ -285,6 +285,10 @@ async fn audiobook_search(settings: State<'_, AppSettings>, q: String) -> Result
 }
 
 /// Save a whole book (all chapters) into Downloads/Cindrix/Audiobooks and add it to the library.
+/// How far along the current book download is: (chapters done, chapters total).
+#[tauri::command]
+fn audiobook_progress() -> (usize, usize) { audiobooks::progress() }
+
 #[tauri::command]
 async fn audiobook_download(settings: State<'_, AppSettings>, lib: State<'_, LibraryStore>, id: String, title: String) -> Result<usize, String> {
     online_or_err(&settings)?;
@@ -594,7 +598,7 @@ pub fn run() {
             player_next, player_enqueue, player_volume, player_seek,
             get_settings, lyrics_get, lyrics_set, lyrics_list, set_lyrics_viewer, set_grid_down, accept_terms, set_eq,
             podcast_list, podcast_add, podcast_import_opml, podcast_refresh, podcast_remove,
-            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, podcast_search, podcast_preview,
+            podcast_download, podcast_mark_played, audiobook_search, audiobook_download, audiobook_progress, podcast_search, podcast_preview,
             library_sources, library_add_source, library_remove_source, library_set_kinds,
             library_scan, library_set_details, library_search, library_genres, library_counts, library_artists, library_albums,
             radio_stations, radio_add, radio_remove, radio_import, radio_probe, radio_search, radio_play, radio_record,
