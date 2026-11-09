@@ -198,7 +198,7 @@
 <style>
   .shell{display:grid;grid-template-columns:232px 1fr;grid-template-rows:68px 1fr 92px;height:100%}
   header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(#0f1823,var(--bg))}
-  header img{mix-blend-mode:screen}.sp{flex:1}
+  header img{mix-blend-mode:screen}.sp{flex:1;min-width:0}
   .mode{height:38px;padding:0 16px;border-radius:19px;border:1px solid #2A3747;background:#0A0E13;color:#fff;font-size:14px;display:flex;align-items:center;gap:8px}
   .mode :global(svg){color:var(--green)}
   .mode.grid{border-color:var(--blue);color:var(--lblue);background:#1FA8FF14}.mode.grid :global(svg){color:var(--blue)}
@@ -220,7 +220,9 @@
   .tools{display:flex;gap:2px;align-items:center}
   .burger,.scrim{display:none}
   @media (max-width:800px){
-    .shell{grid-template-columns:1fr;grid-template-rows:56px 1fr auto}
+    .shell{grid-template-columns:minmax(0,1fr);grid-template-rows:56px minmax(0,1fr) auto;width:100%;max-width:100vw;overflow:hidden}
+    .shell>*{min-width:0}
+    header{overflow:hidden}
     header{grid-column:1;padding:0 10px;gap:4px}
     header img{height:34px}
     .burger{display:inline-flex;width:44px;height:44px;border-radius:12px;border:0;background:transparent;color:var(--silver);align-items:center;justify-content:center}
@@ -238,5 +240,12 @@
     .vol{display:none}
     .tools{margin-left:auto}
     .seekline{top:-9px}
+  }
+  @media (max-width:430px){
+    .mode{padding:0 8px;font-size:11px;gap:4px;height:32px}
+    .mode :global(svg){width:16px;height:16px}
+    .hb{width:32px;height:38px}
+    header{gap:0;padding:0 6px}
+    header img{height:28px}
   }
 </style>
