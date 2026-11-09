@@ -27,26 +27,6 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  private fun showLastCrash() {
-    try {
-      val sb = StringBuilder()
-      val f = crashFile()
-      if (f.exists()) { sb.append(f.readText().take(1800)); f.delete() }
-      val r = File(filesDir, "rust-crash.txt")
-      if (r.exists()) { sb.append("\n").append(r.readText().take(1800)); r.delete() }
-      if (Build.VERSION.SDK_INT >= 30) {
-        val am = getSystemService(ActivityManager::class.java)
-        am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()?.let {
-          if (it.reason in listOf(2, 4, 5, 6, 7)) sb.append("\nLast exit: reason ").append(it.reason).append(" - ").append(it.description)
-        }
-      }
-      if (sb.isNotEmpty()) {
-        AlertDialog.Builder(this).setTitle("Cindrix Radio closed unexpectedly last time")
-          .setMessage(sb.toString()).setPositiveButton("OK", null).show()
-      }
-    } catch (_: Throwable) {}
-  }
-
   override fun onCreate(savedInstanceState: Bundle?) {
     installCrashHandler()
     super.onCreate(savedInstanceState)
@@ -60,7 +40,6 @@ class MainActivity : TauriActivity() {
       }
     } catch (_: Throwable) {}
     try { MediaBridge.init(this) } catch (_: Throwable) {}
-    showLastCrash()
     try { askPermissions() } catch (_: Throwable) {}
   }
 

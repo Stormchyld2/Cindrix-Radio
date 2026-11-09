@@ -11,11 +11,18 @@ add = "".join(f'    <uses-permission android:name="android.permission.{p}" />\n'
 s = s.replace("<application", add + "    <application", 1)
 if "usesCleartextTraffic" not in s:
     s = s.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+# GateActivity becomes the launcher: it shows a crash report (if any) before opening the app
+m = re.search(r'(android:name="\.MainActivity".*?)<intent-filter>.*?</intent-filter>', s, flags=re.S)
+if m: s = s[:m.start()] + m.group(1) + s[m.end():]
+gate = ('    <activity android:name=".GateActivity" android:exported="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">\n'
+        '      <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>\n'
+        '    </activity>\n')
+s = s.replace("</application>", gate + "    </application>", 1)
 svc = '    <service android:name=".PlaybackService" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n'
 s = s.replace("</application>", svc + "    </application>", 1)
 man.write_text(s)
 pkg = next(gen.glob("java/**/MainActivity.kt")).parent
-for f in ("MainActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt"):
+for f in ("MainActivity.kt", "GateActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt"):
     shutil.copy(pathlib.Path("android") / f, pkg / f)
 
 # Gradle: bundle the open-source yt-dlp library, and let it unpack its native files
