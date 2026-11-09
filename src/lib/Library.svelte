@@ -81,6 +81,26 @@
     clearInterval(poll);
     getting = null; bBusy = null;
   }
+  // An audiobook folder with many files shows as ONE book; playing it queues every part in order.
+  type Book = { key: string; title: string; parts: LibItem[]; dur: number };
+  const books_ = $derived.by((): Book[] | null => {
+    if (kind !== "Audiobook") return null;
+    const m = new Map<string, LibItem[]>();
+    for (const i of items) {
+      const k = i.path.replace(/[\\/][^\\/]*$/, "");
+      const a = m.get(k);
+      if (a) a.push(i); else m.set(k, [i]);
+    }
+    return [...m].map(([k, p]) => {
+      p.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+      return { key: k, title: p.length > 1 ? p[0].group : p[0].title, parts: p, dur: p.reduce((a, x) => a + (x.duration_secs ?? 0), 0) };
+    });
+  });
+  async function playBook(b: Book) {
+    await actions.play(toTrack(b.parts[0]));
+    for (const p of b.parts.slice(1)) await actions.enqueue(toTrack(p));
+  }
+  const queueBook = async (b: Book) => { for (const p of b.parts) await actions.enqueue(toTrack(p)); };
   const typing = () => { clearTimeout(timer); timer = setTimeout(refresh, 200); };
 
   const toTrack = (i: LibItem) => ({ id: i.id, title: i.title, subtitle: i.artist || i.group, kind: i.kind, duration_secs: i.duration_secs, path: i.path });
@@ -94,7 +114,7 @@
     await actions.play(toTrack(pool[0]));
     for (const t of pool.slice(1, 40)) await actions.enqueue(toTrack(t));
   }
-  const fmt = (s: number | null) => (s == null ? "" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+  const fmt = (s: number | null) => (s == null ? "" : s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 </script>
 
 <div class="types">
@@ -174,6 +194,28 @@
     {#each genres as [g, n] (g)}
       <button class="row pick" onclick={() => openGenre(g)}><div class="meta"><b>{g}</b><span>{n} {n === 1 ? "song" : "songs"}</span></div></button>
     {:else}<p class="note">No genres found. Genres come from tags or from your folder names.</p>{/each}
+  </div>
+{:else if books_}
+  <div class="rows">
+    {#each books_ as b (b.key)}
+      {#if b.parts.length === 1}
+        {@const i = b.parts[0]}
+        <div class="row" class:off={!i.available}>
+          <button class="play" disabled={!i.available} aria-label="Play {i.title}" onclick={() => start(i)}>▶</button>
+          <div class="meta"><b>{i.title}</b><span>{[i.artist || i.group, i.album].filter(Boolean).join(" · ")}</span></div>
+          {#if !i.available}<span class="tag">Unavailable</span>{/if}
+          <span class="time">{fmt(i.duration_secs)}</span>
+          <RowMenu track={toTrack(i)} canQueue={playable(i)} onQueue={() => actions.enqueue(toTrack(i))} onEdit={inTauri && i.available ? () => startEdit(i) : undefined} />
+        </div>
+      {:else}
+        <div class="row" class:off={!b.parts[0].available}>
+          <button class="play" disabled={!b.parts[0].available} aria-label="Play {b.title}" onclick={() => playBook(b)}>▶</button>
+          <div class="meta"><b>{b.title}</b><span>{b.parts.length} parts · plays straight through</span></div>
+          <span class="time">{fmt(b.dur)}</span>
+          <RowMenu track={toTrack(b.parts[0])} title={b.title} canQueue={true} onQueue={() => queueBook(b)} />
+        </div>
+      {/if}
+    {/each}
   </div>
 {:else}
   <div class="rows">
