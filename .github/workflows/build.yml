@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p src-tauri/ytdlp
-          curl -L --fail -o src-tauri/ytdlp/yt-dlp.exe https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe
+          curl -L --fail --retry 8 --retry-all-errors --retry-delay 15 -o src-tauri/ytdlp/yt-dlp.exe https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe
           test "$(wc -c < src-tauri/ytdlp/yt-dlp.exe)" -gt 1000000
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       # production configuration: the YouTube helper must compile out cleanly
@@ -65,7 +65,13 @@ jobs:
       - name: Add permissions, playback service and storage access
         run: python3 android/patch.py
       - name: Build release APK (arm64)
-        run: npx tauri android build --apk --target aarch64 --ci
+        run: |
+          # the Gradle download occasionally fails with a 504 from services.gradle.org: try up to 4 times
+          for i in 1 2 3 4; do
+            npx tauri android build --apk --target aarch64 --ci && exit 0
+            echo "build attempt $i failed; retrying in 30 s"; sleep 30
+          done
+          exit 1
       - name: Sign with the Cindrix key (so each build installs over the last one)
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
