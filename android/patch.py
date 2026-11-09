@@ -52,3 +52,11 @@ rules = "\n-keep class app.cindrix.radio.** { *; }\n-keep class com.yausername.*
 if pg is not None: pg.write_text(pg.read_text() + rules)
 else: pathlib.Path("src-tauri/gen/android/app/proguard-rules.pro").write_text(rules)
 print(man.read_text()); print(t)
+
+
+# the Gradle download from services.gradle.org sometimes takes longer than the default 10 s: allow 2 minutes
+wp = pathlib.Path("src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties")
+if wp.exists():
+    w = wp.read_text()
+    w = re.sub(r"networkTimeout=\d+", "networkTimeout=120000", w) if "networkTimeout" in w else w + "\nnetworkTimeout=120000\n"
+    wp.write_text(w)
