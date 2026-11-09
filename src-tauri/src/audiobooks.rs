@@ -40,7 +40,8 @@ pub fn search(q: &str) -> Result<Vec<BookHit>, String> {
         .query(&[("q", lucene.as_str()), ("fl[]", "identifier"), ("fl[]", "title"), ("fl[]", "creator"), ("fl[]", "runtime"),
                  ("rows", "30"), ("output", "json"), ("sort[]", "downloads desc")])
         .send().and_then(|r| r.error_for_status()).map_err(|e| format!("Could not search: {e}"))?
-        .json().map_err(|e| format!("Unexpected answer from the book catalog: {e}"))?;
+        .text().map_err(|e| e.to_string())
+        .and_then(|t| serde_json::from_str(&t).map_err(|e| format!("Unexpected answer from the book catalog: {e}")))?;
     let docs = body["response"]["docs"].as_array().cloned().unwrap_or_default();
     Ok(docs.iter().filter_map(|d| {
         let id = text(&d["identifier"]);
@@ -91,7 +92,8 @@ pub fn download(root: &Path, id: &str, title: &str) -> Result<(PathBuf, usize), 
     let c = client()?;
     let meta: serde_json::Value = c.get(format!("https://archive.org/metadata/{id}"))
         .send().and_then(|r| r.error_for_status()).map_err(|e| format!("Could not open the book: {e}"))?
-        .json().map_err(|e| e.to_string())?;
+        .text().map_err(|e| e.to_string())
+        .and_then(|t| serde_json::from_str(&t).map_err(|e| e.to_string()))?;
     let chapters = chapter_files(&meta);
     if chapters.is_empty() { return Err("This book has no mp3 chapters to download".into()); }
     let dir = root.join(crate::podcasts::sanitize_name(title));
