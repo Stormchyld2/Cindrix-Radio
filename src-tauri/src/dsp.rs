@@ -53,6 +53,9 @@ impl Biquad {
         let y = self.b0 * x + self.z1;
         self.z1 = self.b1 * x - self.a1 * y + self.z2;
         self.z2 = self.b2 * x - self.a2 * y;
+        // flush tiny values: denormal numbers make low-frequency filters very slow on phone CPUs
+        if self.z1.abs() < 1e-15 { self.z1 = 0.0; }
+        if self.z2.abs() < 1e-15 { self.z2 = 0.0; }
         y
     }
 }

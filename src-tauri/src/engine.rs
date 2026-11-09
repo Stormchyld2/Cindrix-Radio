@@ -128,6 +128,87 @@ impl<S: Source<Item = f32>> Source for Counted<S> {
     }
 }
 
+/// Decodes and equalizes ahead of time on its own thread, so the phone's audio callback only
+/// copies ready samples. This keeps playback steady when the CPU is busy or the audio route
+/// (Bluetooth) uses larger buffers; a seek discards what was decoded ahead.
+struct Prefetch {
+    rx: std::sync::mpsc::Receiver<(u64, Vec<f32>)>,
+    ctl: std::sync::mpsc::Sender<Duration>,
+    want: u64,
+    cur: Vec<f32>,
+    pos: usize,
+    eof: bool,
+    ch: u16,
+    rate: u32,
+    total: Option<Duration>,
+}
+
+impl Prefetch {
+    const CHUNK: usize = 4096;
+    fn new<S: Source<Item = f32> + Send + 'static>(mut inner: S) -> Self {
+        let (ch, rate, total) = (inner.channels(), inner.sample_rate(), inner.total_duration());
+        let (tx, rx) = std::sync::mpsc::sync_channel::<(u64, Vec<f32>)>(16);
+        let (ctl, crx) = std::sync::mpsc::channel::<Duration>();
+        std::thread::spawn(move || {
+            let mut gen = 0u64;
+            loop {
+                while let Ok(d) = crx.try_recv() { let _ = inner.try_seek(d); gen += 1; }
+                let mut chunk = Vec::with_capacity(Self::CHUNK);
+                while chunk.len() < Self::CHUNK {
+                    match inner.next() { Some(x) => chunk.push(x), None => break }
+                }
+                let ended = chunk.len() < Self::CHUNK;
+                if !chunk.is_empty() && tx.send((gen, chunk)).is_err() { return; }
+                if ended {
+                    if tx.send((gen, Vec::new())).is_err() { return; }
+                    // finished: wait in case the listener seeks back, and exit once we are dropped
+                    match crx.recv() { Ok(d) => { let _ = inner.try_seek(d); gen += 1; } Err(_) => return }
+                }
+            }
+        });
+        Prefetch { rx, ctl, want: 0, cur: Vec::new(), pos: 0, eof: false, ch, rate, total }
+    }
+}
+
+impl Iterator for Prefetch {
+    type Item = f32;
+    fn next(&mut self) -> Option<f32> {
+        if self.pos >= self.cur.len() {
+            loop {
+                if self.eof { return None; }
+                match self.rx.recv() {
+                    Ok((g, v)) => {
+                        if g != self.want { continue; }
+                        if v.is_empty() { self.eof = true; return None; }
+                        self.cur = v;
+                        self.pos = 0;
+                        break;
+                    }
+                    Err(_) => return None,
+                }
+            }
+        }
+        let x = self.cur[self.pos];
+        self.pos += 1;
+        Some(x)
+    }
+}
+
+impl Source for Prefetch {
+    fn current_frame_len(&self) -> Option<usize> { None }
+    fn channels(&self) -> u16 { self.ch }
+    fn sample_rate(&self) -> u32 { self.rate }
+    fn total_duration(&self) -> Option<Duration> { self.total }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        self.want += 1;
+        self.eof = false;
+        self.cur.clear();
+        self.pos = 0;
+        let _ = self.ctl.send(pos);
+        Ok(())
+    }
+}
+
 /// Open a file and queue it on the sink (through the equalizer).
 fn append_file(sink: &Sink, path: &str, sh: &SharedEq) -> Result<(), String> {
     let f = File::open(path).map_err(|e| e.to_string())?;
@@ -135,7 +216,7 @@ fn append_file(sink: &Sink, path: &str, sh: &SharedEq) -> Result<(), String> {
     let (rate, ch, total) = (dec.sample_rate(), dec.channels(), dec.total_duration());
     trace(format!("play {} ({rate} Hz, {ch} ch, length {:?})", Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("?"), total.map(|d| d.as_secs())));
     let counted = Counted { inner: dec.convert_samples::<f32>(), n: Arc::new(AtomicU64::new(0)), done: false, rate, ch };
-    sink.append(EqSource::new(counted, sh.clone()));
+    sink.append(Prefetch::new(EqSource::new(counted, sh.clone())));
     Ok(())
 }
 
