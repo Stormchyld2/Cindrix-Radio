@@ -25,6 +25,16 @@ pkg = next(gen.glob("java/**/MainActivity.kt")).parent
 for f in ("MainActivity.kt", "GateActivity.kt", "PlaybackService.kt", "MediaBridge.kt", "YtBridge.kt"):
     shutil.copy(pathlib.Path("android") / f, pkg / f)
 
+# C++ runtime for the audio library (cpal/oboe): link is added in build.rs, the library itself is packaged here
+import os
+ndk = os.environ.get("NDK_HOME", "")
+cxx = pathlib.Path(ndk) / "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+dest = pathlib.Path("src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a")
+dest.mkdir(parents=True, exist_ok=True)
+if not cxx.exists():
+    raise SystemExit(f"libc++_shared.so not found at {cxx}")
+shutil.copy(cxx, dest / "libc++_shared.so")
+
 # Gradle: bundle the open-source yt-dlp library, and let it unpack its native files
 g = next(pathlib.Path("src-tauri/gen/android/app").glob("build.gradle.kts"))
 t = g.read_text()

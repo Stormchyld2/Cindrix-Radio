@@ -82,6 +82,7 @@ jobs:
           "$BT/zipalign" -p -f 4 "$APK" "$RUNNER_TEMP/aligned.apk"
           "$BT/apksigner" sign --ks "$RUNNER_TEMP/cindrix.keystore" --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KS_PASS --key-pass env:KEY_PASS --out dist-android/Cindrix-Radio.apk "$RUNNER_TEMP/aligned.apk"
+          unzip -l dist-android/Cindrix-Radio.apk | grep -E "libc\+\+_shared|libcindrix_radio_lib" || { echo "native libraries missing from the APK"; exit 1; }
           "$BT/apksigner" verify --print-certs dist-android/Cindrix-Radio.apk | head -3
           rm -f "$RUNNER_TEMP/cindrix.keystore"
       - name: Upload APK

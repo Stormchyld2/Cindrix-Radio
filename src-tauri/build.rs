@@ -18,5 +18,9 @@ fn main() {
     if std::env::var("CARGO_FEATURE_YTDL").is_ok() {
         println!("cargo:rustc-cfg=ytdl_on");
     }
+    // The phone's audio output (oboe, C++) needs the shared C++ runtime; it is bundled by the CI patch step.
+    if std::env::var("CARGO_CFG_TARGET_OS").map(|o| o == "android").unwrap_or(false) {
+        println!("cargo:rustc-link-lib=c++_shared");
+    }
     tauri_build::build()
 }
